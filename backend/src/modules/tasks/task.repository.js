@@ -2,10 +2,59 @@ const { prisma } = require("../../lib/prisma");
 
 async function createTask(data) {
   return prisma.task.create({
-    data,
+    data: {
+      title: data.title,
+      description: data.description,
+      status: data.status,
+      priority: data.priority,
+
+      estimateHours: data.estimateHours,
+      startDate: data.startDate,
+      dueDate: data.dueDate,
+
+      project: {
+        connect: {
+          id: data.projectId
+        }
+      },
+
+      organization: {
+        connect: {
+          id: data.orgId
+        }
+      },
+
+      creator: {
+        connect: {
+          id: data.createdById
+        }
+      },
+
+      ...(data.assigneeId && {
+        assignee: {
+          connect: {
+            id: data.assigneeId
+          }
+        }
+      })
+    },
+
     include: {
-      assignee: { select: { id: true, name: true, email: true } },
-      creator: { select: { id: true, name: true, email: true } },
+      assignee: {
+        select: {
+          id: true,
+          name: true,
+          email: true
+        }
+      },
+
+      creator: {
+        select: {
+          id: true,
+          name: true,
+          email: true
+        }
+      }
     }
   });
 }
@@ -109,23 +158,27 @@ async function getDependentsByTaskId(dependsOnTaskId) {
   });
 }
 
-// Function to recursively find if targetTaskId is a dependency of currentTaskId
 async function isCircularDependency(currentTaskId, targetTaskId, visited = new Set()) {
   if (currentTaskId === targetTaskId) return true;
   if (visited.has(currentTaskId)) return false;
-  
+
   visited.add(currentTaskId);
-  
+
   const dependencies = await prisma.taskDependency.findMany({
     where: { taskId: currentTaskId },
     select: { dependsOnTaskId: true }
   });
-  
+
   for (const dep of dependencies) {
-    const isCircular = await isCircularDependency(dep.dependsOnTaskId, targetTaskId, visited);
+    const isCircular = await isCircularDependency(
+      dep.dependsOnTaskId,
+      targetTaskId,
+      visited
+    );
+
     if (isCircular) return true;
   }
-  
+
   return false;
 }
 
