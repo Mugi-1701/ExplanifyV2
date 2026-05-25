@@ -1,131 +1,298 @@
 const { prisma } = require("../../lib/prisma");
 
+/**
+ * CREATE TASK
+ */
 async function createTask(data) {
   return prisma.task.create({
-    data,
+    data: {
+      title: data.title,
+
+      description: data.description,
+
+      status: data.status || "TODO",
+
+      priority: data.priority || "MEDIUM",
+
+      estimateHours:
+        data.estimateHours || null,
+
+      startDate:
+        data.startDate || null,
+
+      dueDate:
+        data.dueDate || null,
+
+      organizationId:
+        data.organizationId,
+
+      projectId:
+        data.projectId,
+
+      createdById:
+        data.createdById,
+
+      ...(data.assigneeId && {
+        assigneeId: data.assigneeId,
+      }),
+    },
+
     include: {
-      assignee: { select: { id: true, name: true, email: true } },
-      creator: { select: { id: true, name: true, email: true } },
-    }
+      assignee: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+
+      creator: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+    },
   });
 }
 
-async function getTasksByProject(projectId, filters = {}) {
+/**
+ * GET TASKS BY PROJECT
+ */
+async function getTasksByProject(
+  projectId,
+  filters = {}
+) {
   return prisma.task.findMany({
     where: {
       projectId,
-      ...filters
+      ...filters,
     },
-    include: {
-      assignee: { select: { id: true, name: true, email: true } }
-    },
-    orderBy: { createdAt: 'desc' }
-  });
-}
 
-async function getTaskById(id) {
-  return prisma.task.findUnique({
-    where: { id },
     include: {
-      assignee: { select: { id: true, name: true, email: true } },
-      creator: { select: { id: true, name: true, email: true } },
+      assignee: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+      // include dependency relations so callers can compute blocking state
       dependencies: {
         include: {
-          dependsOnTask: { select: { id: true, title: true, status: true } }
-        }
+          dependsOnTask: {
+            select: {
+              id: true,
+              title: true,
+              status: true,
+            },
+          },
+        },
       },
+    },
+
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+}
+
+/**
+ * GET TASK BY ID
+ */
+async function getTaskById(taskId) {
+  return prisma.task.findUnique({
+    where: {
+      id: taskId,
+    },
+
+    include: {
+      assignee: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+
+      creator: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+
+      dependencies: {
+        include: {
+          dependsOnTask: true,
+        },
+      },
+
       dependents: {
         include: {
-          task: { select: { id: true, title: true, status: true } }
-        }
-      }
-    }
+          task: true,
+        },
+      },
+    },
   });
 }
 
-async function updateTask(id, data) {
+/**
+ * UPDATE TASK
+ */
+async function updateTask(taskId, data) {
   return prisma.task.update({
-    where: { id },
+    where: {
+      id: taskId,
+    },
+
     data,
+
     include: {
-      assignee: { select: { id: true, name: true, email: true } },
-    }
+      assignee: true,
+    },
   });
 }
 
-async function deleteTask(id) {
+/**
+ * DELETE TASK
+ */
+async function deleteTask(taskId) {
   return prisma.task.delete({
-    where: { id }
+    where: {
+      id: taskId,
+    },
   });
 }
 
-async function createDependency(taskId, dependsOnTaskId) {
+/**
+ * CREATE DEPENDENCY
+ */
+async function createDependency(
+  taskId,
+  dependsOnTaskId
+) {
   return prisma.taskDependency.create({
     data: {
       taskId,
-      dependsOnTaskId
-    }
+      dependsOnTaskId,
+    },
   });
 }
 
+/**
+ * REMOVE DEPENDENCY
+ */
 async function removeDependency(id) {
   return prisma.taskDependency.delete({
-    where: { id }
+    where: { id },
   });
 }
 
-async function getDependency(taskId, dependsOnTaskId) {
+/**
+ * GET DEPENDENCY
+ */
+async function getDependency(
+  taskId,
+  dependsOnTaskId
+) {
   return prisma.taskDependency.findUnique({
     where: {
       taskId_dependsOnTaskId: {
         taskId,
-        dependsOnTaskId
-      }
-    }
+        dependsOnTaskId,
+      },
+    },
   });
 }
 
+/**
+ * GET DEPENDENCY BY ID
+ */
 async function getDependencyById(id) {
   return prisma.taskDependency.findUnique({
-    where: { id }
+    where: { id },
   });
 }
 
-async function getDependenciesByTaskId(taskId) {
+/**
+ * GET DEPENDENCIES BY TASK ID
+ */
+async function getDependenciesByTaskId(
+  taskId
+) {
   return prisma.taskDependency.findMany({
-    where: { taskId },
+    where: {
+      taskId,
+    },
+
     include: {
-      dependsOnTask: { select: { id: true, title: true, status: true } }
-    }
+      dependsOnTask: true,
+    },
   });
 }
 
-async function getDependentsByTaskId(dependsOnTaskId) {
+/**
+ * GET DEPENDENTS BY TASK ID
+ */
+async function getDependentsByTaskId(
+  dependsOnTaskId
+) {
   return prisma.taskDependency.findMany({
-    where: { dependsOnTaskId },
+    where: {
+      dependsOnTaskId,
+    },
+
     include: {
-      task: { select: { id: true, title: true, status: true } }
-    }
+      task: true,
+    },
   });
 }
 
-// Function to recursively find if targetTaskId is a dependency of currentTaskId
-async function isCircularDependency(currentTaskId, targetTaskId, visited = new Set()) {
-  if (currentTaskId === targetTaskId) return true;
-  if (visited.has(currentTaskId)) return false;
-  
-  visited.add(currentTaskId);
-  
-  const dependencies = await prisma.taskDependency.findMany({
-    where: { taskId: currentTaskId },
-    select: { dependsOnTaskId: true }
-  });
-  
-  for (const dep of dependencies) {
-    const isCircular = await isCircularDependency(dep.dependsOnTaskId, targetTaskId, visited);
-    if (isCircular) return true;
+/**
+ * CIRCULAR DEPENDENCY CHECK
+ */
+async function isCircularDependency(
+  currentTaskId,
+  targetTaskId,
+  visited = new Set()
+) {
+  if (currentTaskId === targetTaskId) {
+    return true;
   }
-  
+
+  if (visited.has(currentTaskId)) {
+    return false;
+  }
+
+  visited.add(currentTaskId);
+
+  const dependencies =
+    await prisma.taskDependency.findMany({
+      where: {
+        taskId: currentTaskId,
+      },
+
+      select: {
+        dependsOnTaskId: true,
+      },
+    });
+
+  for (const dep of dependencies) {
+    const circular =
+      await isCircularDependency(
+        dep.dependsOnTaskId,
+        targetTaskId,
+        visited
+      );
+
+    if (circular) {
+      return true;
+    }
+  }
+
   return false;
 }
 
@@ -141,5 +308,5 @@ module.exports = {
   getDependencyById,
   getDependenciesByTaskId,
   getDependentsByTaskId,
-  isCircularDependency
+  isCircularDependency,
 };

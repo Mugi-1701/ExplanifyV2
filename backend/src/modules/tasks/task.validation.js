@@ -26,6 +26,7 @@ const updateTaskSchema = z.object({
 });
 
 const createDependencySchema = z.object({
+  taskId: z.string().uuid('Invalid taskId'),
   dependsOnTaskId: z.string().uuid('Invalid dependsOnTaskId')
 });
 

@@ -1,14 +1,24 @@
-const taskService = require('./task.service');
-const { createTaskSchema, updateTaskSchema, createDependencySchema } = require('./task.validation');
+const taskService = require("./task.service");
+
+const resolveActiveOrgId = (req) =>
+  req.orgId || req.auth?.activeOrgId || req.auth?.organizationId || req.auth?.orgId || null;
 
 async function createTask(req, res, next) {
   try {
-    const orgId = req.orgId || req.body.orgId;
-    const userId = req.auth ? req.auth.userId : req.user.id;
-    const validatedData = createTaskSchema.parse(req.body);
+    const orgId = resolveActiveOrgId(req);
 
-    const task = await taskService.createTask(orgId, userId, validatedData);
-    res.status(201).json(task);
+    if (!orgId) {
+      return res.status(401).json({
+        status: "error",
+        message: "No active organization found in token",
+      });
+    }
+
+    const userId = req.auth?.userId;
+
+    const task = await taskService.createTask(orgId, userId, req.body);
+
+    return res.status(201).json(task);
   } catch (error) {
     next(error);
   }
@@ -16,19 +26,27 @@ async function createTask(req, res, next) {
 
 async function getTasks(req, res, next) {
   try {
-    const { projectId } = req.query;
-    const orgId = req.orgId || req.query.orgId;
-    
-    // We expect projectId to be provided to scope it, you can optionally support fetching all tasks within an org too
-    let filters = {};
-    if (req.query.status) filters.status = req.query.status;
-    
-    if (!projectId) {
-       return res.status(400).json({ status: 'error', message: 'projectId is required in query' });
+    const orgId = resolveActiveOrgId(req);
+
+    if (!orgId) {
+      return res.status(401).json({
+        status: "error",
+        message: "No active organization found in token",
+      });
     }
 
-    const tasks = await taskService.getTasksByProject(orgId, projectId, filters);
-    res.json(tasks);
+    const { projectId } = req.query;
+
+    if (!projectId) {
+      return res.status(400).json({
+        status: "error",
+        message: "projectId is required in query",
+      });
+    }
+
+    const tasks = await taskService.getTasksByProject(orgId, projectId);
+
+    return res.status(200).json(tasks);
   } catch (error) {
     next(error);
   }
@@ -36,8 +54,9 @@ async function getTasks(req, res, next) {
 
 async function getTaskById(req, res, next) {
   try {
-    // req.task is loaded by middleware
-    res.json(req.task);
+    const taskId = req.params.taskId;
+    const task = await taskService.getTaskById(taskId);
+    return res.status(200).json(task);
   } catch (error) {
     next(error);
   }
@@ -45,9 +64,9 @@ async function getTaskById(req, res, next) {
 
 async function updateTask(req, res, next) {
   try {
-    const validatedData = updateTaskSchema.parse(req.body);
-    const updated = await taskService.updateTask(req.task.id, validatedData);
-    res.json(updated);
+    const updatedTask = await taskService.updateTask(req.params.taskId, req.body);
+
+    return res.status(200).json(updatedTask);
   } catch (error) {
     next(error);
   }
@@ -55,8 +74,11 @@ async function updateTask(req, res, next) {
 
 async function deleteTask(req, res, next) {
   try {
-    await taskService.deleteTask(req.task.id);
-    res.status(204).send();
+    await taskService.deleteTask(req.params.taskId);
+
+    return res.status(200).json({
+      message: "Task deleted successfully",
+    });
   } catch (error) {
     next(error);
   }
@@ -64,9 +86,18 @@ async function deleteTask(req, res, next) {
 
 async function addDependency(req, res, next) {
   try {
-    const validatedData = createDependencySchema.parse(req.body);
-    const dependency = await taskService.addDependency(req.task.id, validatedData.dependsOnTaskId);
-    res.status(201).json(dependency);
+    const taskId = req.body.taskId;
+    const dependsOnTaskId = req.body.dependsOnTaskId;
+    
+    if (!taskId) {
+      return res.status(400).json({
+        status: "error",
+        message: "taskId is required in body",
+      });
+    }
+
+    const dependency = await taskService.addDependency(taskId, dependsOnTaskId);
+    return res.status(201).json(dependency);
   } catch (error) {
     next(error);
   }
@@ -74,8 +105,9 @@ async function addDependency(req, res, next) {
 
 async function getDependencies(req, res, next) {
   try {
-    const graph = await taskService.getDependencyGraph(req.task.id);
-    res.json(graph);
+    const taskId = req.params.taskId;
+    const graph = await taskService.getDependencyGraph(taskId);
+    return res.status(200).json(graph);
   } catch (error) {
     next(error);
   }
@@ -83,8 +115,9 @@ async function getDependencies(req, res, next) {
 
 async function removeDependency(req, res, next) {
   try {
-    await taskService.removeDependency(req.task.id, req.params.dependencyId);
-    res.status(204).send();
+    const dependencyId = req.params.dependencyId;
+    await taskService.removeDependency(dependencyId);
+    return res.status(204).send();
   } catch (error) {
     next(error);
   }
@@ -98,5 +131,5 @@ module.exports = {
   deleteTask,
   addDependency,
   getDependencies,
-  removeDependency
+  removeDependency,
 };

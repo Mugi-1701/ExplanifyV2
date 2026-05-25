@@ -6,6 +6,7 @@ const { signupSchema, loginSchema, refreshSchema } = require("./auth.validation"
 
 const router = express.Router();
 
+router.post("/register", validate(signupSchema), signupHandler);
 router.post("/signup", validate(signupSchema), signupHandler);
 router.post("/login", validate(loginSchema), loginHandler);
 router.post("/refresh", validate(refreshSchema), refreshHandler);
