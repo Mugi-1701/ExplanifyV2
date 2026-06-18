@@ -5,7 +5,7 @@
 
 import { api } from "./api";
 import { persistTokens, clearAuthStorage } from "@/lib/token";
-import type { LoginInput, RegisterInput, AuthPayload, AuthError } from "@/types/auth.types";
+import type { LoginInput, RegisterInput, AuthPayload } from "@/types/auth.types";
 
 /**
  * Parse auth response from backend
@@ -23,6 +23,7 @@ function parseAuthPayload(rawData: unknown): AuthPayload {
   const accessToken = resolved?.accessToken;
   const refreshToken = resolved?.refreshToken;
   const user = resolved?.user;
+  const organization = resolved?.organization;
 
   if (typeof accessToken !== "string" || typeof refreshToken !== "string") {
     throw new Error("Invalid auth response from server");
@@ -32,6 +33,7 @@ function parseAuthPayload(rawData: unknown): AuthPayload {
     accessToken,
     refreshToken,
     user: user as AuthPayload["user"],
+    organization: (organization as AuthPayload["organization"]) ?? null,
   };
 }
 
@@ -102,7 +104,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<AuthPayl
     const payload = parseAuthPayload(response.data);
     persistTokens(payload.accessToken, payload.refreshToken);
     return payload;
-  } catch (error) {
+  } catch {
     clearAuthStorage();
     return null;
   }
@@ -139,10 +141,12 @@ export async function validateSession(): Promise<AuthPayload | null> {
   }
 }
 
-export default {
+const authService = {
   login,
   register,
   refreshAccessToken,
   logout,
   validateSession,
 };
+
+export default authService;

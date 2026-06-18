@@ -18,7 +18,7 @@ function ProjectErrorState({ message, onRetry }: ProjectErrorStateProps) {
           </div>
           <div>
             <CardTitle className="text-xl text-white">Project data unavailable</CardTitle>
-            <CardDescription className="text-white/65">We couldn’t load live projects from the backend.</CardDescription>
+            <CardDescription className="text-white/65">We could not load live projects from the backend.</CardDescription>
           </div>
         </div>
       </CardHeader>

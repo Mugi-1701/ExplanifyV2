@@ -16,7 +16,6 @@ function PasswordInput({ className, id, invalid = false, ...props }: PasswordInp
   const generatedId = useId();
   const inputId = id ?? generatedId;
   const [isVisible, setIsVisible] = useState(false);
-  const Icon = isVisible ? EyeOff : Eye;
 
   return (
     <div className="relative">
@@ -35,7 +34,11 @@ function PasswordInput({ className, id, invalid = false, ...props }: PasswordInp
         onClick={() => setIsVisible((current) => !current)}
         className="absolute inset-y-0 right-3 flex w-8 items-center justify-center rounded-full text-violet-300 transition hover:bg-white/5 hover:text-violet-200"
       >
-        <Icon className="size-4" aria-hidden="true" />
+        {isVisible ? (
+          <EyeOff className="size-4" aria-hidden="true" />
+        ) : (
+          <Eye className="size-4" aria-hidden="true" />
+        )}
       </button>
     </div>
   );

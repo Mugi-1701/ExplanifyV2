@@ -13,33 +13,45 @@ function computeCoordinationState(task) {
     };
   }
 
+  const dependencies = Array.isArray(task.dependencies) ? task.dependencies : [];
+
+  const hasBlockingDependencies = dependencies.some((dependency) => {
+    const dependsOnTask = dependency.dependsOnTask;
+
+    if (!dependsOnTask) {
+      return true;
+    }
+
+    return dependsOnTask.status !== "DONE";
+  });
+
   // DONE takes highest precedence
   if (task.status === "DONE") {
     return {
-      coordinationState: "DONE",
+      coordinationState: "COMPLETED",
       isBlocked: false,
       blockingTasks: [],
       coordinationReason: "Task completed",
     };
   }
 
-  const deps = Array.isArray(task.dependencies) ? task.dependencies : [];
+  const blocking = dependencies
+    .filter((dependency) => !dependency.dependsOnTask || dependency.dependsOnTask.status !== "DONE")
+    .map((dependency) => {
+      const dependsOnTask = dependency.dependsOnTask;
 
-  // Determine blocking tasks
-  const blocking = [];
-  for (const d of deps) {
-    const t = d.dependsOnTask;
-    if (!t) {
-      blocking.push({ id: d.dependsOnTaskId, title: "unknown", status: "UNKNOWN" });
-      continue;
-    }
+      if (!dependsOnTask) {
+        return { id: dependency.dependsOnTaskId, title: "unknown", status: "UNKNOWN" };
+      }
 
-    if (t.status !== "DONE") {
-      blocking.push({ id: t.id, title: t.title || "(untitled)", status: t.status });
-    }
-  }
+      return {
+        id: dependsOnTask.id,
+        title: dependsOnTask.title || "(untitled)",
+        status: dependsOnTask.status,
+      };
+    });
 
-  if (blocking.length > 0) {
+  if (hasBlockingDependencies && blocking.length > 0) {
     const titles = blocking.map((b) => b.title).join(", ");
     const reason = blocking.length === 1 ? `Waiting for ${titles}` : `Waiting for ${titles}`;
     return {

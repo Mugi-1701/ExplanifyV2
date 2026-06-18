@@ -123,6 +123,30 @@ async function removeDependency(req, res, next) {
   }
 }
 
+async function getAvailableTasksForDependency(req, res, next) {
+  try {
+    const orgId = resolveActiveOrgId(req);
+    const { projectId, excludeTaskId } = req.query;
+
+    if (!projectId) {
+      return res.status(400).json({
+        status: "error",
+        message: "projectId is required",
+      });
+    }
+
+    const tasks = await taskService.getAvailableTasksForDependency(
+      orgId,
+      projectId,
+      excludeTaskId
+    );
+
+    return res.status(200).json(tasks);
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   createTask,
   getTasks,
@@ -132,4 +156,5 @@ module.exports = {
   addDependency,
   getDependencies,
   removeDependency,
+  getAvailableTasksForDependency,
 };

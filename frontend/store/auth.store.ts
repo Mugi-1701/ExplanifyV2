@@ -36,13 +36,13 @@ export const useAuthStore = create<AuthStore>()(
         // Persist tokens to storage
         persistTokens(accessToken, refreshToken || "");
 
-        set({
-          user: user || null,
+        set((state) => ({
+          user: user !== undefined ? user : state.user,
           accessToken,
           refreshToken: refreshToken || null,
           isAuthenticated: true,
           isLoading: false,
-        });
+        }));
       },
 
       setUser: (user) => {
@@ -68,6 +68,7 @@ export const useAuthStore = create<AuthStore>()(
     {
       name: "auth-store",
       partialize: (state) => ({
+        user: state.user,
         accessToken: state.accessToken,
         refreshToken: state.refreshToken,
       }),

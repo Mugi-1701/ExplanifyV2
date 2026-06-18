@@ -5,13 +5,14 @@ const createTaskSchema = z.object({
   description: z.string().optional(),
   status: z.enum(['TODO', 'IN_PROGRESS', 'BLOCKED', 'IN_REVIEW', 'DONE', 'CANCELED']).optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional(),
-  estimateHours: z.number().positive().optional(),
+  estimateHours: z.coerce.number().positive().optional().nullable(),
   startDate: z.string().datetime().optional().nullable(),
-  dueDate: z.string().datetime().optional().nullable(),
+  dueDate: z.coerce.date().optional().nullable(),
   projectId: z.string().uuid(),
   orgId: z.string().uuid().optional(),
   organizationId: z.string().uuid().optional(),
-  assigneeId: z.string().uuid().optional().nullable()
+  assigneeId: z.string().uuid().optional().nullable(),
+  dependsOnTaskId: z.string().uuid().optional().nullable()
 });
 
 const updateTaskSchema = z.object({
@@ -19,9 +20,9 @@ const updateTaskSchema = z.object({
   description: z.string().optional(),
   status: z.enum(['TODO', 'IN_PROGRESS', 'BLOCKED', 'IN_REVIEW', 'DONE', 'CANCELED']).optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional(),
-  estimateHours: z.number().positive().optional(),
+  estimateHours: z.coerce.number().positive().optional().nullable(),
   startDate: z.string().datetime().optional().nullable(),
-  dueDate: z.string().datetime().optional().nullable(),
+  dueDate: z.coerce.date().optional().nullable(),
   assigneeId: z.string().uuid().optional().nullable()
 });
 

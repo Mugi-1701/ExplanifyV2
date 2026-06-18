@@ -2,6 +2,7 @@
 
 import { Bell, Menu, Search, Zap } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -25,14 +26,16 @@ function TopNavbar({ onMenuClick }: TopNavbarProps) {
   return (
     <header className="sticky top-0 z-30 border-b border-white/10 bg-[rgba(5,8,22,0.72)] backdrop-blur-2xl">
       <div className="flex items-center gap-4 px-4 py-4 md:px-8">
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-sm"
           onClick={onMenuClick}
-          className="inline-flex size-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white/80 shadow-[0_0_25px_rgba(168,85,247,0.08)] transition hover:bg-white/10 md:hidden"
+          className="border border-white/10 bg-white/5 text-white/80 shadow-[0_0_25px_rgba(168,85,247,0.08)] md:hidden"
           aria-label="Open navigation menu"
         >
           <Menu className="size-5" />
-        </button>
+        </Button>
 
         <div className="relative hidden flex-1 md:block">
           <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-white/30" />
@@ -47,13 +50,9 @@ function TopNavbar({ onMenuClick }: TopNavbarProps) {
             <Zap className="size-4" />
             AI Live
           </div>
-          <button
-            type="button"
-            className="inline-flex size-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white/80 transition hover:bg-white/10"
-            aria-label="Notifications"
-          >
+          <Button type="button" variant="ghost" size="icon-sm" className="border border-white/10 bg-white/5 text-white/80 hover:bg-white/10" aria-label="Notifications">
             <Bell className="size-5" />
-          </button>
+          </Button>
           <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 backdrop-blur-xl">
             <div className="flex size-9 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-blue-500 text-xs font-semibold text-white shadow-[0_0_24px_rgba(59,130,246,0.24)]">
               {initials || "EX"}

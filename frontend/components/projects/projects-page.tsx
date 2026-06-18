@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 
 import { ProjectCard } from "@/components/projects/project-card";
@@ -8,32 +8,51 @@ import { ProjectEmptyState } from "@/components/projects/project-empty-state";
 import { ProjectErrorState } from "@/components/projects/project-error-state";
 import { ProjectFormModal } from "@/components/projects/project-form-modal";
 import { ProjectInsightsCard } from "@/components/projects/project-insights-card";
+import { ProjectMemberModal } from "@/components/projects/project-member-modal";
 import { ProjectRow } from "@/components/projects/project-row";
 import { ProjectSelector } from "@/components/projects/project-selector";
 import { ProjectSkeleton } from "@/components/projects/project-skeleton";
 import { ProjectStats } from "@/components/projects/project-stats";
 import { ProjectToolbar } from "@/components/projects/project-toolbar";
+import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
+import { useToast } from "@/components/ui/toast";
+import { addProjectMember, removeProjectMember, updateProjectMember } from "@/services/project.service";
+import { getUsers, type WorkspaceUser } from "@/services/users.service";
 import { useProjects } from "@/hooks/use-projects";
-import type { CreateProjectInput, ProjectWithStats, UpdateProjectInput } from "@/types/project";
+import { getApiErrorMessage } from "@/lib/api-errors";
+import { getActiveOrgIdFromAccessToken } from "@/lib/token";
+import type { CreateProjectInput, ProjectMember, ProjectStats as ProjectStatsData, ProjectWithStats, UpdateProjectInput } from "@/types/project";
 
-type ProjectsPageProps = {
-  searchParams?: {
-    projectId?: string | string[];
-  };
-};
-
-function ProjectsPage({ searchParams }: ProjectsPageProps) {
+function ProjectsPage() {
+  const { toast } = useToast();
   const { projects, activeProjectId, selectedProject, loading, error, refresh, selectProject, createNewProject, updateExistingProject, removeProject } = useProjects();
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [healthFilter, setHealthFilter] = useState<"ALL" | ProjectStatsData["coordinationHealth"]>("ALL");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<ProjectWithStats | null>(null);
+  const [isMemberOpen, setIsMemberOpen] = useState(false);
+  const [memberMode, setMemberMode] = useState<"add" | "edit">("add");
+  const [editingMember, setEditingMember] = useState<ProjectMember | null>(null);
+  const [removingMember, setRemovingMember] = useState<ProjectMember | null>(null);
+  const [activeDetailsTab, setActiveDetailsTab] = useState<"overview" | "tasks" | "team">("overview");
+  const [workspaceUsers, setWorkspaceUsers] = useState<WorkspaceUser[]>([]);
 
   const filteredProjects = useMemo(() => {
     const normalized = search.trim().toLowerCase();
 
     return projects
       .filter((project) => {
+        if (statusFilter !== "ALL" && (project.status ?? "ACTIVE") !== statusFilter) {
+          return false;
+        }
+
+        if (healthFilter !== "ALL" && project.stats.coordinationHealth !== healthFilter) {
+          return false;
+        }
+
         if (!normalized) {
           return true;
         }
@@ -55,12 +74,18 @@ function ProjectsPage({ searchParams }: ProjectsPageProps) {
         ...project,
         isActive: project.id === activeProjectId,
       }));
-  }, [activeProjectId, projects, search]);
+  }, [activeProjectId, healthFilter, projects, search, statusFilter]);
 
-  const createDefaultOrgId = editingProject?.orgId ?? selectedProject?.orgId ?? projects[0]?.orgId ?? "";
+  const hasActiveFilters = Boolean(search.trim()) || statusFilter !== "ALL" || healthFilter !== "ALL";
+  const createDefaultOrgId = editingProject?.orgId ?? selectedProject?.orgId ?? projects[0]?.orgId ?? getActiveOrgIdFromAccessToken() ?? "";
 
   async function handleCreateProject(input: CreateProjectInput | UpdateProjectInput) {
-    await createNewProject(input as CreateProjectInput);
+    const project = await createNewProject(input as CreateProjectInput);
+    toast({
+      title: "Project created",
+      description: project.name,
+      variant: "success",
+    });
   }
 
   async function handleUpdateProject(input: CreateProjectInput | UpdateProjectInput) {
@@ -70,6 +95,11 @@ function ProjectsPage({ searchParams }: ProjectsPageProps) {
 
     await updateExistingProject(editingProject.id, input as UpdateProjectInput);
     setEditingProject(null);
+    toast({
+      title: "Project updated",
+      description: editingProject.name,
+      variant: "success",
+    });
   }
 
   async function handleDeleteProject(project: ProjectWithStats) {
@@ -78,8 +108,60 @@ function ProjectsPage({ searchParams }: ProjectsPageProps) {
       return;
     }
 
-    await removeProject(project.id);
+    try {
+      await removeProject(project.id);
+      toast({
+        title: "Project deleted",
+        description: project.name,
+        variant: "success",
+      });
+    } catch (deleteError) {
+      toast({
+        title: "Project delete failed",
+        description: getApiErrorMessage(deleteError, "Unable to delete this project."),
+        variant: "error",
+      });
+    }
   }
+
+  async function handleAddMember(input: { userId: string; role?: "OWNER" | "LEAD" | "MEMBER"; skills?: ("Frontend" | "Backend" | "AI/ML" | "UI/UX" | "Testing" | "DevOps")[] }) {
+    if (!selectedProject) return;
+    await addProjectMember(selectedProject.id, input);
+    await refresh();
+    toast({
+      title: "Member added",
+      description: "Team roster updated.",
+      variant: "success",
+    });
+  }
+
+  async function handleEditMember(input: { userId: string; role?: "OWNER" | "LEAD" | "MEMBER"; skills?: ("Frontend" | "Backend" | "AI/ML" | "UI/UX" | "Testing" | "DevOps")[] }) {
+    if (!selectedProject || !editingMember) return;
+    await updateProjectMember(selectedProject.id, editingMember.userId, input);
+    setEditingMember(null);
+    await refresh();
+    toast({
+      title: "Member updated",
+      description: "Role and skills saved.",
+      variant: "success",
+    });
+  }
+
+  async function handleRemoveMember(member: { userId: string; user?: { name?: string | null } }) {
+    if (!selectedProject) return;
+    await removeProjectMember(selectedProject.id, member.userId);
+    setRemovingMember(null);
+    await refresh();
+    toast({
+      title: "Member removed",
+      description: "Project membership deleted.",
+      variant: "success",
+    });
+  }
+
+  useEffect(() => {
+    void getUsers().then(setWorkspaceUsers).catch(() => setWorkspaceUsers([]));
+  }, []);
 
   if (loading && projects.length === 0) {
     return (
@@ -121,13 +203,29 @@ function ProjectsPage({ searchParams }: ProjectsPageProps) {
             <ProjectToolbar
               search={search}
               viewMode={viewMode}
+              statusFilter={statusFilter}
+              healthFilter={healthFilter}
               onSearchChange={setSearch}
               onViewModeChange={setViewMode}
+              onStatusFilterChange={setStatusFilter}
+              onHealthFilterChange={setHealthFilter}
               onCreateProject={() => setIsCreateOpen(true)}
             />
 
             {filteredProjects.length === 0 ? (
-              <ProjectEmptyState />
+              <ProjectEmptyState
+                title={hasActiveFilters ? "No matching projects" : "No projects found"}
+                description={
+                  hasActiveFilters
+                    ? "Adjust the current search or filters to see more live projects."
+                    : "Create a new project to start tracking tasks, dependencies, and AI coordination health."
+                }
+                detail={
+                  hasActiveFilters
+                    ? "The project cache is still preserved; only the current view is filtered."
+                    : "Projects will appear here once the backend returns live records."
+                }
+              />
             ) : viewMode === "grid" ? (
               <div className="grid gap-4 xl:grid-cols-2">
                 {filteredProjects.map((project) => (
@@ -157,7 +255,22 @@ function ProjectsPage({ searchParams }: ProjectsPageProps) {
 
           <div className="space-y-4">
             <ProjectSelector projects={projects} activeProjectId={activeProjectId} onSelectProject={selectProject} />
-            <ProjectInsightsCard project={selectedProject} />
+            <ProjectInsightsCard
+              project={selectedProject}
+              activeTab={activeDetailsTab}
+              onTabChange={setActiveDetailsTab}
+              onAddMember={() => {
+                setMemberMode("add");
+                setEditingMember(null);
+                setIsMemberOpen(true);
+              }}
+              onEditMember={(member) => {
+                setMemberMode("edit");
+                setEditingMember(member);
+                setIsMemberOpen(true);
+              }}
+              onRemoveMember={(member) => setRemovingMember(member)}
+            />
           </div>
         </div>
 
@@ -177,6 +290,37 @@ function ProjectsPage({ searchParams }: ProjectsPageProps) {
           onClose={() => setEditingProject(null)}
           onSubmit={handleUpdateProject}
         />
+
+        <ProjectMemberModal
+          open={isMemberOpen}
+          users={workspaceUsers}
+          mode={memberMode}
+          member={editingMember}
+          onClose={() => setIsMemberOpen(false)}
+          onSubmit={memberMode === "add" ? handleAddMember : handleEditMember}
+        />
+
+        <Dialog
+          open={Boolean(removingMember)}
+          onOpenChange={(nextOpen) => !nextOpen && setRemovingMember(null)}
+          title="Remove member"
+          description={`Remove ${removingMember?.user?.name ?? "this member"} from the project? This only removes their project membership.`}
+          size="md"
+        >
+          <div className="flex justify-end gap-3">
+            <Button type="button" variant="outline" onClick={() => setRemovingMember(null)} className="rounded-2xl border-white/10 bg-white/5 text-white hover:bg-white/10">
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => removingMember && void handleRemoveMember(removingMember)}
+              className="rounded-2xl border-red-400/15 bg-red-500/10 text-red-100 hover:bg-red-500/20"
+            >
+              Remove
+            </Button>
+          </div>
+        </Dialog>
       </motion.main>
   );
 }

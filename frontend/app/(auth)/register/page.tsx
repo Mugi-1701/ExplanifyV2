@@ -70,8 +70,8 @@ export default function RegisterPage() {
 
     try {
       const payload = await authService.register({
-        name,
-        email,
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
         password,
         orgName: orgName.trim() || undefined,
       } as RegisterInput);

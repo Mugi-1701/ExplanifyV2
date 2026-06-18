@@ -1,6 +1,6 @@
 import { api } from "@/lib/api";
 import { ACTIVE_PROJECT_KEY, readStoredValue, removeStoredValue, writeStoredValue } from "@/lib/storage";
-import type { CreateProjectInput, Project, UpdateProjectInput } from "@/types/project";
+import type { AddProjectMemberInput, CreateProjectInput, Project, ProjectMember, UpdateProjectInput } from "@/types/project";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ACTIVE_PROJECT_CHANGED_EVENT = "explanify:active-project-changed";
@@ -115,14 +115,43 @@ async function deleteProject(projectId: string): Promise<void> {
   await api.delete(`/projects/${projectId}`);
 }
 
+async function getProjectMembers(projectId: string) {
+  const { data } = await api.get(`/projects/${projectId}/members`);
+  if (Array.isArray(data)) {
+    return data;
+  }
+  if (data && typeof data === "object" && "data" in data) {
+    return (data as { data?: unknown[] }).data ?? [];
+  }
+  return [];
+}
+
+async function addProjectMember(projectId: string, input: AddProjectMemberInput) {
+  const { data } = await api.post(`/projects/${projectId}/members`, input);
+  return data;
+}
+
+async function updateProjectMember(projectId: string, userId: string, input: Partial<Pick<ProjectMember, "role" | "skills">>) {
+  const { data } = await api.patch(`/projects/${projectId}/members/${userId}`, input);
+  return data;
+}
+
+async function removeProjectMember(projectId: string, userId: string) {
+  await api.delete(`/projects/${projectId}/members/${userId}`);
+}
+
 export {
   ACTIVE_PROJECT_CHANGED_EVENT,
   clearActiveProjectId,
   createProject,
   deleteProject,
+  addProjectMember,
   getActiveProjectId,
   getProjectById,
+  getProjectMembers,
   getProjects,
+  removeProjectMember,
   setActiveProjectId,
+  updateProjectMember,
   updateProject,
 };

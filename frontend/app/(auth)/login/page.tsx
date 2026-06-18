@@ -58,7 +58,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const payload = await authService.login({ email, password } as LoginInput);
+      const payload = await authService.login({ email: email.trim().toLowerCase(), password } as LoginInput);
       setAuth(payload);
       router.replace(nextPage);
     } catch (err) {

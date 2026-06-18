@@ -12,15 +12,18 @@ import axios, { AxiosError, type AxiosInstance, type InternalAxiosRequestConfig 
 import { AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY, clearAuthStorage, getToken } from "@/lib/token";
 import { queryClient } from "@/lib/query-client";
 import { useAuthStore } from "@/store/auth.store";
+import { emitToast } from "@/lib/toast";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
-const AUTH_REFRESH_ENDPOINTS = ["/auth/login", "/auth/register", "/auth/refresh", "/auth/logout", "/auth/me"];
+const AUTH_REFRESH_ENDPOINTS = ["/auth/login", "/auth/register", "/auth/refresh", "/auth/logout"];
+const AUTH_EXPIRED_EVENT = "explanify:auth-expired";
 
 type RetryableRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean;
 };
 
 let refreshRequest: Promise<string | null> | null = null;
+let authExpiredNotified = false;
 
 function isAuthEndpoint(url?: string) {
   return AUTH_REFRESH_ENDPOINTS.some((endpoint) => url?.includes(endpoint));
@@ -60,12 +63,10 @@ async function refreshSessionToken(): Promise<string | null> {
     const refreshed = await refreshAccessToken(refreshToken);
 
     if (!refreshed?.accessToken) {
-      clearAuthStorage();
-      queryClient.clear();
-      useAuthStore.getState().logout();
       return null;
     }
 
+    authExpiredNotified = false;
     useAuthStore.getState().setAuth({
       user: refreshed.user,
       accessToken: refreshed.accessToken,
@@ -78,6 +79,27 @@ async function refreshSessionToken(): Promise<string | null> {
   });
 
   return refreshRequest;
+}
+
+function notifyAuthExpired() {
+  clearAuthStorage();
+  queryClient.clear();
+  useAuthStore.getState().logout();
+
+  if (authExpiredNotified) {
+    return;
+  }
+
+  authExpiredNotified = true;
+  emitToast({
+    title: "Session expired",
+    description: "Please log in again to continue.",
+    variant: "error",
+  });
+
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+  }
 }
 
 // Simplified axios client for development: attaches Bearer token from localStorage.
@@ -103,7 +125,12 @@ api.interceptors.response.use(
     const status = error.response?.status;
     const requestUrl = originalRequest?.url;
 
-    if (!originalRequest || status !== 401 || originalRequest._retry || isAuthEndpoint(requestUrl)) {
+    if (!originalRequest || status !== 401 || isAuthEndpoint(requestUrl)) {
+      return Promise.reject(error);
+    }
+
+    if (originalRequest._retry) {
+      notifyAuthExpired();
       return Promise.reject(error);
     }
 
@@ -113,19 +140,18 @@ api.interceptors.response.use(
       const nextToken = await refreshSessionToken();
 
       if (!nextToken) {
+        notifyAuthExpired();
         return Promise.reject(error);
       }
 
       applyBearerToken(originalRequest);
       return api.request(originalRequest);
     } catch (refreshError) {
-      clearAuthStorage();
-      queryClient.clear();
-      useAuthStore.getState().logout();
+      notifyAuthExpired();
       return Promise.reject(refreshError instanceof AxiosError ? refreshError : error);
     }
   }
 );
 
-export { api };
+export { AUTH_EXPIRED_EVENT, api };
 export default api;

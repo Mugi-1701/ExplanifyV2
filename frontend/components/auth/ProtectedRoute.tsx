@@ -1,23 +1,17 @@
 /**
  * Protected route component
- * Redirects unauthenticated users to login
- * Shows loader while checking auth state
- * 
- * CRITICAL: All navigation happens in useEffect, never in render body
- * 
- * Logic:
- * 1. Component mounts → set mounted = true
- * 2. Auth initializes → isLoading false, check isAuthenticated
- * 3. If not authenticated → redirect once (tracked by hasRedirected)
- * 4. If authenticated → render children
+ * Redirects unauthenticated users to login.
  */
 
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { AUTH_TOKEN_KEY, getToken } from "@/lib/token";
+import { useCallback, useEffect, useState } from "react";
+import type React from "react";
+import { usePathname, useRouter } from "next/navigation";
+
 import { FullScreenLoader } from "@/components/loaders/FullScreenLoader";
+import { AUTH_TOKEN_KEY, getToken } from "@/lib/token";
+import { AUTH_EXPIRED_EVENT } from "@/services/api";
 
 type ProtectedRouteProps = {
   children: React.ReactNode;
@@ -25,7 +19,13 @@ type ProtectedRouteProps = {
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
+
+  const redirectToLogin = useCallback(() => {
+    const next = pathname || "/dashboard";
+    router.replace(`/login?next=${encodeURIComponent(next)}`);
+  }, [pathname, router]);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,23 +46,32 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
       return;
     }
 
-    const token = getToken(AUTH_TOKEN_KEY);
-
-    if (!token) {
-      if (process.env.NODE_ENV !== "production") {
-        console.debug("[ROUTE] No access token found — redirecting to /login");
-      }
-      router.replace("/login");
+    if (!getToken(AUTH_TOKEN_KEY)) {
+      redirectToLogin();
     }
-  }, [mounted, router]);
+  }, [mounted, redirectToLogin]);
+
+  useEffect(() => {
+    if (!mounted) {
+      return;
+    }
+
+    const handleExpiredSession = () => {
+      redirectToLogin();
+    };
+
+    window.addEventListener(AUTH_EXPIRED_EVENT, handleExpiredSession);
+
+    return () => {
+      window.removeEventListener(AUTH_EXPIRED_EVENT, handleExpiredSession);
+    };
+  }, [mounted, redirectToLogin]);
 
   if (!mounted) {
     return <FullScreenLoader message="Redirecting to login..." />;
   }
 
-  const token = getToken(AUTH_TOKEN_KEY);
-
-  if (!token) {
+  if (!getToken(AUTH_TOKEN_KEY)) {
     return <FullScreenLoader message="Redirecting to login..." />;
   }
 

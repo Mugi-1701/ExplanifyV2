@@ -2,9 +2,9 @@ const express = require("express");
 const { authenticate } = require("../auth/auth.middleware");
 const { requireOrgMembership, requireOrgRole } = require("../organizations/organization.middleware");
 const { validate } = require("../../middleware/validate");
-const { createProjectSchema, updateProjectSchema, listProjectsSchema } = require("./project.validation");
+const { createProjectSchema, updateProjectSchema, listProjectsSchema, addProjectMemberSchema, updateProjectMemberSchema } = require("./project.validation");
 const { attachOrgIdFromBody, loadProject, requireOrgMembershipIfQuery } = require("./project.middleware");
-const { create, list, getById, update, remove } = require("./project.controller");
+const { create, list, getById, update, remove, listMembers, addMember, updateMember, removeMember } = require("./project.controller");
 
 const router = express.Router();
 
@@ -49,6 +49,37 @@ router.delete(
 	requireOrgMembership(),
 	requireOrgRole(["OWNER", "ADMIN"]),
 	remove
+);
+
+router.get("/:id/members", authenticate(), loadProject(), requireOrgMembership(), listMembers);
+
+router.post(
+	"/:id/members",
+	authenticate(),
+	loadProject(),
+	requireOrgMembership(),
+	requireOrgRole(["OWNER", "ADMIN"]),
+	validate(addProjectMemberSchema),
+	addMember
+);
+
+router.patch(
+	"/:id/members/:userId",
+	authenticate(),
+	loadProject(),
+	requireOrgMembership(),
+	requireOrgRole(["OWNER", "ADMIN"]),
+	validate(updateProjectMemberSchema),
+	updateMember
+);
+
+router.delete(
+	"/:id/members/:userId",
+	authenticate(),
+	loadProject(),
+	requireOrgMembership(),
+	requireOrgRole(["OWNER", "ADMIN"]),
+	removeMember
 );
 
 module.exports = router;

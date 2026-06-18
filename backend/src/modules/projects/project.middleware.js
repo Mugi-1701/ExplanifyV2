@@ -25,7 +25,13 @@ const requireOrgMembershipIfQuery = () => (req, res, next) => {
 };
 
 const loadProject = () => async (req, res, next) => {
-  const project = await findProjectById(req.params.id);
+  const projectId = req.params.projectId ?? req.params.id;
+
+  if (!projectId) {
+    return next(new AppError("projectId is required", 400));
+  }
+
+  const project = await findProjectById(projectId);
   if (!project) {
     return next(new AppError("Project not found", 404));
   }

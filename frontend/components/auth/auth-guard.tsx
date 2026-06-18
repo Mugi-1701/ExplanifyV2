@@ -37,14 +37,6 @@ export const AuthGuard = ({ children }: { children: React.ReactNode }) => {
     }
   }, [mounted, isAuthenticated, isLoading, router, pathname]);
 
-  useEffect(() => {
-    if (mounted && !isLoading) {
-      if (process.env.NODE_ENV !== "production") {
-        console.debug(isAuthenticated ? "VERIFY SUCCESS" : "VERIFY FAILED");
-      }
-    }
-  }, [mounted, isAuthenticated, isLoading]);
-
   if (!mounted) {
     return <FullScreenLoader message="Verifying access..." />;
   }

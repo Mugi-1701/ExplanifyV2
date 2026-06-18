@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 
-import { keepPreviousData, queryKeys } from "@/lib/query-client";
+import { keepPreviousData, queryDefaults, queryKeys } from "@/lib/query-client";
 import { getTasks, resolveProjectId } from "@/services/task.service";
 import type { Task } from "@/types/task";
 
@@ -15,9 +15,6 @@ type UseTasksState = {
   refetch: () => Promise<void>;
 };
 
-const TASKS_STALE_TIME_MS = 30000;
-const TASKS_GC_TIME_MS = 300000;
-
 function useTasks(projectId?: string): UseTasksState {
   const resolvedProjectId = useMemo(() => projectId ?? resolveProjectId() ?? null, [projectId]);
 
@@ -25,8 +22,12 @@ function useTasks(projectId?: string): UseTasksState {
     queryKey: queryKeys.tasks(resolvedProjectId),
     queryFn: async () => getTasks(resolvedProjectId ?? undefined),
     enabled: Boolean(resolvedProjectId),
-    staleTime: TASKS_STALE_TIME_MS,
-    gcTime: TASKS_GC_TIME_MS,
+    staleTime: queryDefaults.staleTime,
+    gcTime: queryDefaults.gcTime,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    retry: 1,
     placeholderData: keepPreviousData,
   });
 

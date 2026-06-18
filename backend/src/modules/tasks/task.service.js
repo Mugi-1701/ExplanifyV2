@@ -2,6 +2,7 @@ const { AppError } = require("../../utils/AppError");
 const taskRepository = require("./task.repository");
 const { prisma } = require("../../lib/prisma");
 const { computeCoordinationState, getTaskBlockingState } = require("./utils/getTaskBlockingState");
+const coordinationService = require("./coordination.service");
 
 /**
  * Recalculate blocked state for a single task and persist status changes
@@ -32,6 +33,12 @@ async function recalcAndPersistBlockedState(taskId) {
  * CREATE TASK
  */
 async function createTask(orgId, userId, data) {
+  console.log("[taskService.createTask] incoming payload", {
+    title: data.title,
+    projectId: data.projectId,
+    dependsOnTaskId: data.dependsOnTaskId,
+  });
+
   const project = await prisma.project.findFirst({
     where: {
       id: data.projectId,
@@ -53,12 +60,34 @@ async function createTask(orgId, userId, data) {
     priority: data.priority || "MEDIUM",
     estimateHours: data.estimateHours,
     startDate: data.startDate,
-    dueDate: data.dueDate,
+    dueDate: data.dueDate ? new Date(data.dueDate) : null,
     organizationId: orgId,
     projectId: data.projectId,
     createdById: userId,
     assigneeId: data.assigneeId,
   });
+
+  // If dependsOnTaskId provided, create dependency relationship
+  if (data.dependsOnTaskId) {
+    if (created.id === data.dependsOnTaskId) {
+      throw new AppError("Task cannot depend on itself", 400);
+    }
+
+    // Verify the dependency task exists and belongs to same project
+    const depTask = await taskRepository.getTaskById(data.dependsOnTaskId);
+    if (!depTask || depTask.projectId !== data.projectId) {
+      throw new AppError("Dependency task not found or belongs to different project", 404);
+    }
+
+    // Check for circular dependencies
+    const isCircular = await taskRepository.isCircularDependency(data.dependsOnTaskId, created.id);
+    if (isCircular) {
+      throw new AppError("Circular dependency detected", 400);
+    }
+
+    // Create the dependency
+    await taskRepository.createDependency(created.id, data.dependsOnTaskId);
+  }
 
   // Ensure blocked state reflects any dependencies (if present)
   await recalcAndPersistBlockedState(created.id);
@@ -66,6 +95,17 @@ async function createTask(orgId, userId, data) {
   // return enriched task
   const task = await taskRepository.getTaskById(created.id);
   const computed = computeCoordinationState(task);
+  console.log("[taskService.createTask] persisted task", {
+    id: task?.id,
+    title: task?.title,
+    status: task?.status,
+    dependencies: task?.dependencies,
+    dependencyIds: task?.dependencies?.map((dependency) => dependency.dependsOnTaskId) ?? [],
+    dependencyCount: task?.dependencies?.length ?? 0,
+    blockingTaskCount: computed.blockingTasks.length,
+    isBlocked: computed.isBlocked,
+    coordinationState: computed.coordinationState,
+  });
   return {
     ...task,
     isBlocked: computed.isBlocked,
@@ -94,6 +134,12 @@ async function getTasksByProject(orgId, projectId, filters = {}) {
   }
 
   const tasks = await taskRepository.getTasksByProject(projectId, filters);
+  console.log("[taskService.getTasksByProject] fetched tasks", tasks.map((task) => ({
+    id: task.id,
+    title: task.title,
+    status: task.status,
+    dependencyCount: task.dependencies?.length ?? 0,
+  })));
 
   // enrich tasks with blocked state using available dependency data (batched)
   const enriched = tasks.map((t) => {
@@ -148,7 +194,7 @@ async function updateTask(taskId, data) {
     throw new AppError("Task not found", 404);
   }
 
-  const updated = await taskRepository.updateTask(taskId, data);
+  await taskRepository.updateTask(taskId, data);
 
   // If status changed, recalc dependents' blocked state
   if (data.status) {
@@ -164,12 +210,19 @@ async function updateTask(taskId, data) {
   const refreshed = await taskRepository.getTaskById(taskId);
   const computed = computeCoordinationState(refreshed);
 
+  // Check for coordination suggestions (e.g., dependent tasks that are now READY)
+  let coordinationSuggestions = [];
+  if (data.status) {
+    coordinationSuggestions = await coordinationService.findCoordinationSuggestions(taskId);
+  }
+
   return {
-    ...updated,
+    ...refreshed,
     isBlocked: computed.isBlocked,
     blockingTasks: computed.blockingTasks,
     coordinationReason: computed.coordinationReason,
     coordinationState: computed.coordinationState,
+    coordinationSuggestions,
   };
 }
 
@@ -187,7 +240,15 @@ async function deleteTask(taskId) {
     throw new AppError("Task not found", 404);
   }
 
-  return taskRepository.deleteTask(taskId);
+  const dependentTaskIds = (existingTask.dependents || []).map((dependency) => dependency.task?.id).filter(Boolean);
+
+  const deletedTask = await taskRepository.deleteTask(taskId);
+
+  for (const dependentTaskId of dependentTaskIds) {
+    await recalcAndPersistBlockedState(dependentTaskId);
+  }
+
+  return deletedTask;
 }
 
 /**
@@ -261,6 +322,40 @@ async function getDependencyGraph(taskId) {
   return { dependencies };
 }
 
+/**
+ * GET AVAILABLE TASKS FOR DEPENDENCY SELECTION
+ * Returns all tasks in a project that can be selected as dependencies
+ * Filters out completed/cancelled tasks and the current task
+ */
+async function getAvailableTasksForDependency(orgId, projectId, excludeTaskId) {
+  if (!projectId) {
+    throw new AppError("Project ID is required", 400);
+  }
+
+  // Get all tasks in the project, optionally excluding current task
+  const filters = {};
+  if (excludeTaskId) {
+    filters.NOT = { id: excludeTaskId };
+  }
+
+  // Filter out DONE and CANCELLED tasks - only show tasks that can block
+  const allTasks = await taskRepository.getTasksByProject(projectId, {
+    ...filters,
+    status: {
+      in: ["TODO", "IN_PROGRESS", "IN_REVIEW", "BLOCKED"]
+    }
+  });
+  
+  const available = allTasks.map(task => ({
+    id: task.id,
+    title: task.title,
+    status: task.status,
+    priority: task.priority,
+  }));
+
+  return available;
+}
+
 module.exports = {
   createTask,
   getTasksByProject,
@@ -270,4 +365,5 @@ module.exports = {
   addDependency,
   removeDependency,
   getDependencyGraph,
+  getAvailableTasksForDependency,
 };

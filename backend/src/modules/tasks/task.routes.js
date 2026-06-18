@@ -118,6 +118,18 @@ router.delete(
 );
 
 /**
+ * GET AVAILABLE TASKS FOR DEPENDENCY SELECTION
+ * GET /api/tasks/available-for-dependency?projectId=xxx&excludeTaskId=yyy
+ * MUST COME BEFORE /:taskId ROUTES
+ */
+router.get(
+  "/available-for-dependency",
+  extractTasksContext,
+  requireOrgMembership(),
+  taskController.getAvailableTasksForDependency
+);
+
+/**
  * =========================================
  * PARAMETERIZED TASK ROUTES
  * KEEP THESE LAST

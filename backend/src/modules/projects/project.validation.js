@@ -27,4 +27,30 @@ const listProjectsSchema = z.object({
   orgId: z.string().uuid().optional(),
 });
 
-module.exports = { createProjectSchema, updateProjectSchema, listProjectsSchema };
+const projectMemberRoleEnum = z.enum(["OWNER", "LEAD", "MEMBER"]);
+const projectSkillEnum = z.enum(["Frontend", "Backend", "AI/ML", "UI/UX", "Testing", "DevOps"]);
+
+const addProjectMemberSchema = z.object({
+  userId: z.string().uuid(),
+  role: projectMemberRoleEnum.optional(),
+  skills: z.array(projectSkillEnum).optional(),
+});
+
+const updateProjectMemberSchema = z
+  .object({
+    role: projectMemberRoleEnum.optional(),
+    skills: z.array(projectSkillEnum).optional(),
+  })
+  .refine((value) => value.role !== undefined || value.skills !== undefined, {
+    message: "At least one field is required",
+  });
+
+module.exports = {
+  createProjectSchema,
+  updateProjectSchema,
+  listProjectsSchema,
+  addProjectMemberSchema,
+  updateProjectMemberSchema,
+  projectMemberRoleEnum,
+  projectSkillEnum,
+};

@@ -2,7 +2,7 @@ import type { ProjectStats, ProjectWithStats } from "@/types/project";
 
 function formatProjectDate(value?: string | null) {
   if (!value) {
-    return "—";
+    return "-";
   }
 
   return new Intl.DateTimeFormat("en", {
@@ -30,7 +30,7 @@ function getCoordinationTone(health: ProjectStats["coordinationHealth"]) {
 
 function getCoordinationLabel(project: ProjectWithStats) {
   if (project.isActive && project.stats.taskCount === 0) {
-    return "Active • no tasks";
+    return "Active - no tasks";
   }
 
   return project.stats.coordinationHealth;

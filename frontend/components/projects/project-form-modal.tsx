@@ -8,6 +8,7 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { getApiErrorMessage } from "@/lib/api-errors";
 import type { CreateProjectInput, Project, UpdateProjectInput } from "@/types/project";
 
 type ProjectFormValues = {
@@ -29,6 +30,14 @@ type ProjectFormModalProps = {
   onSubmit: (input: CreateProjectInput | UpdateProjectInput) => Promise<void>;
 };
 
+function toDateInputValue(value?: string | null) {
+  if (!value) {
+    return "";
+  }
+
+  return value.slice(0, 10);
+}
+
 function ProjectFormModal({ open, mode, defaultOrgId, project, onClose, onSubmit }: ProjectFormModalProps) {
   const initialValues = useMemo<ProjectFormValues>(
     () => ({
@@ -37,14 +46,15 @@ function ProjectFormModal({ open, mode, defaultOrgId, project, onClose, onSubmit
       slug: project?.slug ?? "",
       orgId: project?.orgId ?? defaultOrgId ?? "",
       teamId: project?.teamId ?? "",
-      startDate: project?.startDate ?? "",
-      dueDate: project?.dueDate ?? "",
+      startDate: toDateInputValue(project?.startDate),
+      dueDate: toDateInputValue(project?.dueDate),
     }),
     [defaultOrgId, project]
   );
 
   const [values, setValues] = useState<ProjectFormValues>(initialValues);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,6 +62,7 @@ function ProjectFormModal({ open, mode, defaultOrgId, project, onClose, onSubmit
     queueMicrotask(() => {
       if (open && !cancelled) {
         setValues(initialValues);
+        setError(null);
       }
     });
 
@@ -64,6 +75,7 @@ function ProjectFormModal({ open, mode, defaultOrgId, project, onClose, onSubmit
     event.preventDefault();
 
     setSubmitting(true);
+    setError(null);
     try {
       if (mode === "create") {
         await onSubmit({
@@ -87,6 +99,8 @@ function ProjectFormModal({ open, mode, defaultOrgId, project, onClose, onSubmit
       }
 
       onClose();
+    } catch (submitError) {
+      setError(getApiErrorMessage(submitError, mode === "create" ? "Unable to create project." : "Unable to update project."));
     } finally {
       setSubmitting(false);
     }
@@ -177,6 +191,12 @@ function ProjectFormModal({ open, mode, defaultOrgId, project, onClose, onSubmit
                     type="date"
                     className="h-12 rounded-2xl border-white/10 bg-white/5 text-white md:col-span-1"
                   />
+
+                  {error ? (
+                    <div className="rounded-2xl border border-rose-300/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100 md:col-span-2">
+                      {error}
+                    </div>
+                  ) : null}
 
                   <div className="flex flex-col gap-3 md:col-span-2 md:flex-row md:justify-end">
                     <Button type="button" variant="outline" onClick={onClose} className="rounded-2xl border-white/10 bg-white/5 text-white hover:bg-white/10">

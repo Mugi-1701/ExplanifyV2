@@ -30,6 +30,9 @@ function writeCookie(key: string, value: string, maxAgeSeconds = 60 * 60 * 24 * 
   if (typeof document === "undefined") {
     return;
   }
+  void key;
+  void value;
+  void maxAgeSeconds;
   // Intentionally left blank during auth stabilization: do not write cookies.
 }
 
@@ -37,6 +40,7 @@ function removeCookie(key: string) {
   if (typeof document === "undefined") {
     return;
   }
+  void key;
   // Intentionally left blank during auth stabilization: do not remove cookies.
 }
 

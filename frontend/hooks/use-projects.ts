@@ -14,7 +14,7 @@ import {
   setActiveProjectId,
   updateProject,
 } from "@/services/project.service";
-import { keepPreviousData, queryClient as sharedQueryClient, queryKeys } from "@/lib/query-client";
+import { keepPreviousData, queryClient as sharedQueryClient, queryDefaults, queryKeys } from "@/lib/query-client";
 import { useActiveProjectId } from "@/hooks/use-active-project-id";
 import type { CreateProjectInput, Project, ProjectStats, ProjectWithStats, UpdateProjectInput } from "@/types/project";
 import type { Task } from "@/types/task";
@@ -33,8 +33,6 @@ type UseProjectsResult = {
   removeProject: (projectId: string) => Promise<void>;
 };
 
-const PROJECTS_GC_TIME_MS = 300000;
-const PROJECTS_STALE_TIME_MS = 30000;
 const EMPTY_STATS: ProjectStats = {
   taskCount: 0,
   completedTaskCount: 0,
@@ -43,6 +41,21 @@ const EMPTY_STATS: ProjectStats = {
   coordinationHealth: "EMPTY",
   coordinationReason: "No tasks yet",
 };
+
+function normalizeProjectStats(stats?: ProjectStats | null): ProjectStats {
+  if (!stats) {
+    return EMPTY_STATS;
+  }
+
+  return {
+    taskCount: Number(stats.taskCount) || 0,
+    completedTaskCount: Number(stats.completedTaskCount) || 0,
+    blockedTaskCount: Number(stats.blockedTaskCount) || 0,
+    activeTaskCount: Number(stats.activeTaskCount) || 0,
+    coordinationHealth: stats.coordinationHealth ?? "EMPTY",
+    coordinationReason: stats.coordinationReason || "No tasks yet",
+  };
+}
 
 function markActiveProject(projects: ProjectWithStats[], activeProjectId: string | null) {
   return projects.map((project) => ({
@@ -54,7 +67,7 @@ function markActiveProject(projects: ProjectWithStats[], activeProjectId: string
 function buildProjectStats(tasks: Task[]): ProjectStats {
   const taskCount = tasks.length;
   const completedTaskCount = tasks.filter((task) => task.status === "DONE").length;
-  const blockedTaskCount = tasks.filter((task) => task.isBlocked).length;
+  const blockedTaskCount = tasks.filter((task) => task.isBlocked || task.status === "BLOCKED").length;
   const activeTaskCount = tasks.filter((task) => task.status === "IN_PROGRESS").length;
 
   if (taskCount === 0) {
@@ -117,6 +130,13 @@ async function fetchProjectsWithStats(): Promise<ProjectWithStats[]> {
 
   const projectSummaries = await Promise.all(
     safeProjects.map(async (project) => {
+      if (project.stats) {
+        return {
+          project,
+          stats: normalizeProjectStats(project.stats),
+        };
+      }
+
       const cachedTasks = sharedQueryClient.getQueryData<Task[]>(queryKeys.tasks(project.id));
 
       if (cachedTasks !== undefined) {
@@ -128,6 +148,7 @@ async function fetchProjectsWithStats(): Promise<ProjectWithStats[]> {
 
       try {
         const tasks = await getTasks(project.id);
+        sharedQueryClient.setQueryData<Task[]>(queryKeys.tasks(project.id), tasks);
         return {
           project,
           stats: buildProjectStats(tasks),
@@ -155,8 +176,12 @@ function useProjects(): UseProjectsResult {
   const projectsQuery = useQuery({
     queryKey: queryKeys.projects,
     queryFn: fetchProjectsWithStats,
-    staleTime: PROJECTS_STALE_TIME_MS,
-    gcTime: PROJECTS_GC_TIME_MS,
+    staleTime: queryDefaults.staleTime,
+    gcTime: queryDefaults.gcTime,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    retry: 1,
     placeholderData: keepPreviousData,
   });
 
@@ -164,6 +189,19 @@ function useProjects(): UseProjectsResult {
     const data = projectsQuery.data ?? [];
     return markActiveProject(data, activeProjectId);
   }, [activeProjectId, projectsQuery.data]);
+
+  const prefetchProjectTasks = useCallback(
+    (projectId: string) => {
+      void queryClient.prefetchQuery({
+        queryKey: queryKeys.tasks(projectId),
+        queryFn: () => getTasks(projectId),
+        staleTime: queryDefaults.staleTime,
+        gcTime: queryDefaults.gcTime,
+        retry: 1,
+      });
+    },
+    [queryClient]
+  );
 
   useEffect(() => {
     if (projects.length === 0) {
@@ -177,8 +215,9 @@ function useProjects(): UseProjectsResult {
 
     if (!activeProjectExists) {
       setActiveProjectId(projects[0].id);
+      prefetchProjectTasks(projects[0].id);
     }
-  }, [activeProjectId, projects]);
+  }, [activeProjectId, prefetchProjectTasks, projects]);
 
   useEffect(() => {
     const syncActiveProject = () => {
@@ -198,9 +237,10 @@ function useProjects(): UseProjectsResult {
   const selectProject = useCallback(
     (projectId: string) => {
       setActiveProjectId(projectId);
+      prefetchProjectTasks(projectId);
       queryClient.setQueryData<ProjectWithStats[]>(queryKeys.projects, (current = []) => markActiveProject(current, projectId));
     },
-    [queryClient]
+    [prefetchProjectTasks, queryClient]
   );
 
   const createProjectMutation = useMutation({
@@ -244,7 +284,7 @@ function useProjects(): UseProjectsResult {
             ? {
                 ...project,
                 isActive: false,
-                stats: item.stats ?? EMPTY_STATS,
+                stats: project.stats ? normalizeProjectStats(project.stats) : item.stats ?? EMPTY_STATS,
               }
             : item
         )
@@ -288,7 +328,7 @@ function useProjects(): UseProjectsResult {
             ? {
                 ...item,
                 ...project,
-                stats: item.stats,
+                stats: project.stats ? normalizeProjectStats(project.stats) : item.stats,
               }
             : item
         )
@@ -325,6 +365,9 @@ function useProjects(): UseProjectsResult {
       } else {
         clearActiveProjectId();
       }
+    },
+    onSuccess: (_result, projectId) => {
+      queryClient.removeQueries({ queryKey: queryKeys.tasks(projectId), exact: true });
     },
   });
 

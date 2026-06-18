@@ -4,10 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, PanelLeft, Sparkles } from "lucide-react";
-import type { ComponentType } from "react";
 
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { getSidebarNavItemActive, sidebarNavItems, type SidebarNavItem } from "@/components/layout/sidebar-nav.config";
+import { getSidebarNavItemActive, sidebarNavItems } from "@/components/layout/sidebar-nav.config";
 
 type DashboardSidebarProps = {
   open: boolean;
@@ -113,13 +113,9 @@ function DashboardSidebar({ open, onClose }: DashboardSidebarProps) {
                   <PanelLeft className="size-4" />
                   Navigation
                 </div>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="rounded-full border border-white/10 bg-white/5 p-2 text-white/75"
-                >
+                <Button type="button" variant="ghost" size="icon-sm" onClick={onClose} className="border border-white/10 bg-white/5 text-white/75 hover:bg-white/10" aria-label="Close navigation menu">
                   <ChevronLeft className="size-4" />
-                </button>
+                </Button>
               </div>
               <SidebarContent onNavigate={onClose} />
             </motion.aside>

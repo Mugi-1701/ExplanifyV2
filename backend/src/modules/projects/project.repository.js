@@ -1,5 +1,39 @@
 const { prisma } = require("../../lib/prisma");
 
+const projectInclude = {
+  owner: { select: { id: true, name: true, email: true } },
+  organization: { select: { id: true, name: true, slug: true } },
+  members: {
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          avatarUrl: true,
+        },
+      },
+    },
+  },
+  tasks: {
+    select: {
+      id: true,
+      status: true,
+      assigneeId: true,
+      dependencies: {
+        select: {
+          dependsOnTask: {
+            select: {
+              id: true,
+              status: true,
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
 /**
  * Create a new project record.
  */
@@ -16,10 +50,7 @@ const createProject = async ({ orgId, ownerId, teamId, name, slug, description, 
       startDate: startDate ?? null,
       dueDate: dueDate ?? null,
     },
-    include: {
-      owner: { select: { id: true, name: true, email: true } },
-      organization: { select: { id: true, name: true, slug: true } },
-    },
+    include: projectInclude,
   });
 
 /**
@@ -28,10 +59,7 @@ const createProject = async ({ orgId, ownerId, teamId, name, slug, description, 
 const findProjectById = async (id) =>
   prisma.project.findUnique({
     where: { id },
-    include: {
-      owner: { select: { id: true, name: true, email: true } },
-      organization: { select: { id: true, name: true, slug: true } },
-    },
+    include: projectInclude,
   });
 
 /**
@@ -55,10 +83,7 @@ const listProjectsForUser = async ({ userId, orgId }) => {
     where: {
       orgId: whereOrgId ?? { in: allowedOrgIds },
     },
-    include: {
-      owner: { select: { id: true, name: true, email: true } },
-      organization: { select: { id: true, name: true, slug: true } },
-    },
+    include: projectInclude,
     orderBy: { createdAt: "desc" },
   });
 };
@@ -70,17 +95,132 @@ const updateProject = async (id, data) =>
   prisma.project.update({
     where: { id },
     data,
+    include: projectInclude,
+  });
+
+const listProjectMembers = async (projectId) =>
+  prisma.projectMember.findMany({
+    where: { projectId },
     include: {
-      owner: { select: { id: true, name: true, email: true } },
-      organization: { select: { id: true, name: true, slug: true } },
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          avatarUrl: true,
+        },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+const getProjectMember = async (projectId, userId) =>
+  prisma.projectMember.findUnique({
+    where: {
+      projectId_userId: { projectId, userId },
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          avatarUrl: true,
+        },
+      },
     },
   });
+
+const addProjectMember = async ({ projectId, userId, role, skills = [] }) =>
+  prisma.projectMember.create({
+    data: {
+      projectId,
+      userId,
+      role,
+      skills,
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          avatarUrl: true,
+        },
+      },
+    },
+  });
+
+const updateProjectMember = async (projectId, userId, data) =>
+  prisma.projectMember.update({
+    where: {
+      projectId_userId: { projectId, userId },
+    },
+    data,
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          avatarUrl: true,
+        },
+      },
+    },
+  });
+
+const removeProjectMember = async (projectId, userId) =>
+  prisma.projectMember.delete({
+    where: {
+      projectId_userId: { projectId, userId },
+    },
+  });
+
+const getProjectTaskCountsByAssignee = async (projectId) => {
+  const tasks = await prisma.task.findMany({
+    where: { projectId },
+    select: { assigneeId: true, status: true },
+  });
+
+  const counts = new Map();
+  for (const task of tasks) {
+    if (!task.assigneeId) continue;
+    const current = counts.get(task.assigneeId) ?? { assignedTaskCount: 0, activeTaskCount: 0, completedTaskCount: 0 };
+    current.assignedTaskCount += 1;
+    if (task.status === "DONE") current.completedTaskCount += 1;
+    if (task.status === "IN_PROGRESS") current.activeTaskCount += 1;
+    counts.set(task.assigneeId, current);
+  }
+
+  return counts;
+};
 
 /**
  * Delete a project by ID.
  */
 const deleteProject = async (id) =>
-  prisma.project.delete({ where: { id } });
+  prisma.$transaction(async (tx) => {
+    const taskIds = (
+      await tx.task.findMany({
+        where: { projectId: id },
+        select: { id: true },
+      })
+    ).map((task) => task.id);
+
+    if (taskIds.length > 0) {
+      await tx.taskDependency.deleteMany({
+        where: {
+          OR: [{ taskId: { in: taskIds } }, { dependsOnTaskId: { in: taskIds } }],
+        },
+      });
+    }
+
+    await tx.projectActivity.deleteMany({ where: { projectId: id } });
+    await tx.projectMember.deleteMany({ where: { projectId: id } });
+    await tx.task.deleteMany({ where: { projectId: id } });
+
+    return tx.project.delete({ where: { id } });
+  });
 
 module.exports = {
   createProject,
@@ -88,4 +228,10 @@ module.exports = {
   listProjectsForUser,
   updateProject,
   deleteProject,
+  listProjectMembers,
+  getProjectMember,
+  addProjectMember,
+  updateProjectMember,
+  removeProjectMember,
+  getProjectTaskCountsByAssignee,
 };

@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { CalendarDays, CheckCircle2, PencilLine, ShieldAlert, Sparkles, Trash2 } from "lucide-react";
+import { CheckCircle2, PencilLine, ShieldAlert, Sparkles, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

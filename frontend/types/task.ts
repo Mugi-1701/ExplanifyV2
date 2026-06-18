@@ -1,4 +1,4 @@
-export type TaskStatus = "TODO" | "IN_PROGRESS" | "BLOCKED" | "DONE" | "IN_REVIEW" | "CANCELED";
+export type TaskStatus = "TODO" | "IN_PROGRESS" | "BLOCKED" | "DONE" | "IN_REVIEW" | "CANCELED" | "ARCHIVED";
 
 export type BlockingTask = {
   id: string;
@@ -13,20 +13,39 @@ export type TaskDependency = {
   dependsOnTask?: BlockingTask | null;
 };
 
+export type CoordinationSuggestionPayload = {
+  signal: string;
+  taskId: string;
+  taskTitle: string;
+  reason: string;
+  completedDependencyTitle?: string;
+  blockingTaskCount?: number;
+  priority?: string;
+};
+
 export type Task = {
   id: string;
   title: string;
   description?: string | null;
   status: TaskStatus;
   priority?: string | null;
+  dueDate?: string | null;
+  estimateHours?: number | null;
   projectId?: string | null;
   organizationId?: string | null;
   assigneeId?: string | null;
+  assignee?: {
+    id: string;
+    name: string;
+    email: string;
+    avatarUrl?: string | null;
+  } | null;
   isBlocked?: boolean;
   blockingTasks?: BlockingTask[];
   coordinationReason?: string;
-  coordinationState?: "BLOCKED" | "READY" | "ACTIVE" | "DONE";
+  coordinationState?: "BLOCKED" | "READY" | "ACTIVE" | "COMPLETED" | "DONE";
   dependencies?: TaskDependency[];
+  coordinationSuggestions?: CoordinationSuggestionPayload[];
   createdAt?: string;
   updatedAt?: string;
 };
@@ -43,8 +62,10 @@ export type CreateTaskInput = {
   estimateHours?: number;
   startDate?: string;
   dueDate?: string;
+  dependsOnTaskId?: string;
 };
 
 export type UpdateTaskInput = Partial<CreateTaskInput> & {
   status?: TaskStatus;
+  coordinationState?: "BLOCKED" | "READY" | "ACTIVE" | "COMPLETED" | "DONE";
 };

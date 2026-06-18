@@ -1,25 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const AUTH_PAGES = new Set(["/login", "/register"]);
-
-const PROTECTED_PREFIXES = [
-  "/dashboard",
-  "/tasks",
-  "/projects",
-  "/calendar",
-  "/settings",
-  "/ai-coordination",
-];
-
 export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-  const accessToken = request.cookies.get("explanify_access_token")?.value;
-  const refreshToken = request.cookies.get("explanify_refresh_token")?.value;
-  const hasSession = Boolean(accessToken || refreshToken);
-
-  const isAuthPage = AUTH_PAGES.has(pathname);
-  const isProtectedRoute = PROTECTED_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+  void request;
 
   // Note: During development we rely on a client-side localStorage token
   // check (ProtectedRoute). The server-side middleware previously forced

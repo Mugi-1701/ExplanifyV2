@@ -1,8 +1,9 @@
-"use client";
+﻿"use client";
 
 import { motion } from "framer-motion";
 import { AlertCircle, CheckCircle2, Edit3, Trash2, Zap } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CreateTaskInput, Task } from "@/types/task";
@@ -15,19 +16,26 @@ type TaskCardProps = {
   onUpdatePriority: (task: Task, priority: NonNullable<CreateTaskInput["priority"]>) => void;
   onDelete: (task: Task) => void;
   onEdit: (task: Task) => void;
+  onSelectTask: (task: Task) => void;
 };
 
-function TaskCard({ task, onUpdateStatus, onUpdatePriority, onDelete, onEdit }: TaskCardProps) {
+function TaskCard({ task, onUpdateStatus, onUpdatePriority, onDelete, onEdit, onSelectTask }: TaskCardProps) {
   const dependencyNodes = getTaskDependencyNodes(task);
   const dependencyCount = dependencyNodes.length;
+  const formattedUpdatedAt = task.updatedAt
+    ? new Date(task.updatedAt).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      })
+    : null;
 
   return (
     <motion.div whileHover={{ y: -4 }} transition={{ type: "spring", stiffness: 240, damping: 20 }}>
-      <Card className="h-full overflow-hidden border-white/10 bg-white/[0.04]">
+      <Card className="group h-full overflow-hidden border-white/10 bg-white/[0.04] transition hover:border-white/15 hover:bg-white/[0.055]">
         <CardHeader className="space-y-4">
           <div className="flex items-start justify-between gap-4">
-            <div className="space-y-2">
-              <CardTitle className="text-lg text-white">{task.title}</CardTitle>
+            <div className="min-w-0 space-y-2">
+              <CardTitle className="text-lg text-white transition group-hover:text-violet-100">{task.title}</CardTitle>
               <CardDescription className="line-clamp-3 min-h-12 text-white/60">
                 {task.description || "No description provided yet."}
               </CardDescription>
@@ -43,6 +51,15 @@ function TaskCard({ task, onUpdateStatus, onUpdatePriority, onDelete, onEdit }: 
             )}
           </div>
 
+          <div className="flex flex-wrap gap-2">
+            <Badge variant={task.isBlocked ? "warning" : task.status === "DONE" ? "success" : "blue"}>{task.status.replaceAll("_", " ")}</Badge>
+            <Badge variant={task.priority === "CRITICAL" ? "destructive" : task.priority === "HIGH" ? "warning" : "muted"}>
+              {task.priority ?? "MEDIUM"}
+            </Badge>
+            <Badge variant="muted">Assigned {task.assignee?.name ?? "Unassigned"}</Badge>
+            {formattedUpdatedAt ? <Badge variant="muted">Updated {formattedUpdatedAt}</Badge> : null}
+          </div>
+
           <TaskBadges task={task} />
         </CardHeader>
 
@@ -55,9 +72,9 @@ function TaskCard({ task, onUpdateStatus, onUpdatePriority, onDelete, onEdit }: 
             <div className="mt-3 space-y-2">
               {dependencyNodes.length > 0 ? (
                 dependencyNodes.map((dependency) => (
-                  <div key={dependency.id} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm">
-                    <span className="text-white">{dependency.title}</span>
-                    <span className="text-white/45">{dependency.status}</span>
+                  <div key={dependency.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm">
+                    <span className="min-w-0 truncate text-white">{dependency.title}</span>
+                    <span className="shrink-0 text-white/45">{dependency.status}</span>
                   </div>
                 ))
               ) : (
@@ -109,6 +126,9 @@ function TaskCard({ task, onUpdateStatus, onUpdatePriority, onDelete, onEdit }: 
           </div>
 
           <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" className="rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10" onClick={() => onSelectTask(task)}>
+              Inspect
+            </Button>
             <Button variant="outline" size="sm" className="rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10" onClick={() => onUpdateStatus(task, task.status === "DONE" ? "IN_PROGRESS" : "DONE")}>
               <CheckCircle2 className="mr-2 size-4" />
               {task.status === "DONE" ? "Reopen" : "Mark done"}

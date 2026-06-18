@@ -5,6 +5,10 @@ const {
   getProjectService,
   updateProjectService,
   deleteProjectService,
+  listProjectMembersService,
+  addProjectMemberService,
+  updateProjectMemberService,
+  removeProjectMemberService,
 } = require("./project.service");
 
 /**
@@ -73,4 +77,51 @@ const remove = asyncHandler(async (req, res) => {
   res.status(204).send();
 });
 
-module.exports = { create, list, getById, update, remove };
+const listMembers = asyncHandler(async (req, res) => {
+  const members = await listProjectMembersService({
+    projectId: req.params.id,
+    userId: req.auth.userId,
+  });
+  res.status(200).json({ data: members });
+});
+
+const addMember = asyncHandler(async (req, res) => {
+  const member = await addProjectMemberService({
+    projectId: req.params.id,
+    userId: req.auth.userId,
+    actorId: req.auth.userId,
+    data: req.body,
+  });
+  res.status(201).json({ data: member });
+});
+
+const updateMember = asyncHandler(async (req, res) => {
+  const member = await updateProjectMemberService({
+    projectId: req.params.id,
+    userId: req.params.userId,
+    actorId: req.auth.userId,
+    data: req.body,
+  });
+  res.status(200).json({ data: member });
+});
+
+const removeMember = asyncHandler(async (req, res) => {
+  const result = await removeProjectMemberService({
+    projectId: req.params.id,
+    userId: req.params.userId,
+    actorId: req.auth.userId,
+  });
+  res.status(200).json({ data: result });
+});
+
+module.exports = {
+  create,
+  list,
+  getById,
+  update,
+  remove,
+  listMembers,
+  addMember,
+  updateMember,
+  removeMember,
+};

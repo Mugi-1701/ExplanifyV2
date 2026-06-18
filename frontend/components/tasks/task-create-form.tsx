@@ -6,19 +6,25 @@ import type React from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { DependencySelect } from "./dependency-select";
+import { getApiErrorMessage } from "@/lib/api-errors";
 import { resolveProjectId } from "@/services/task.service";
 import type { CreateTaskInput } from "@/types/task";
+import type { Task } from "@/types/task";
 
 type TaskCreateFormProps = {
   projectId?: string;
+  tasks?: Task[];
   onCreate: (input: CreateTaskInput) => Promise<void>;
 };
 
-function TaskCreateForm({ projectId, onCreate }: TaskCreateFormProps) {
+function TaskCreateForm({ projectId, tasks = [], onCreate }: TaskCreateFormProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<CreateTaskInput["priority"]>("MEDIUM");
+  const [dependsOnTaskId, setDependsOnTaskId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const resolvedProjectId = projectId ?? resolveProjectId();
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -27,6 +33,7 @@ function TaskCreateForm({ projectId, onCreate }: TaskCreateFormProps) {
       return;
     }
 
+    setError(null);
     setSubmitting(true);
     try {
       await onCreate({
@@ -35,10 +42,14 @@ function TaskCreateForm({ projectId, onCreate }: TaskCreateFormProps) {
         priority,
         projectId: resolvedProjectId ?? "",
         status: "TODO",
+        dependsOnTaskId: dependsOnTaskId || undefined,
       });
       setTitle("");
       setDescription("");
       setPriority("MEDIUM");
+      setDependsOnTaskId(null);
+    } catch (createError) {
+      setError(getApiErrorMessage(createError, "Unable to create task."));
     } finally {
       setSubmitting(false);
     }
@@ -66,6 +77,18 @@ function TaskCreateForm({ projectId, onCreate }: TaskCreateFormProps) {
               </button>
             ))}
           </div>
+          {resolvedProjectId && (
+            <DependencySelect
+              value={dependsOnTaskId}
+              onChange={setDependsOnTaskId}
+              tasks={tasks}
+            />
+          )}
+          {error ? (
+            <div className="rounded-2xl border border-rose-300/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+              {error}
+            </div>
+          ) : null}
           <Button
             type="submit"
             disabled={submitting || !title.trim() || !resolvedProjectId}
