@@ -62,6 +62,7 @@ const addMember = asyncHandler(async (req, res) => {
     orgId: req.params.id,
     userId: req.body.userId,
     role: req.body.role,
+    actorId: req.auth.userId,
   });
   res.status(201).json({ data: membership });
 });
@@ -69,7 +70,7 @@ const addMember = asyncHandler(async (req, res) => {
 const removeMember = asyncHandler(async (req, res) => {
   await removeMemberFromOrg({
     orgId: req.params.id,
-    userId: req.auth.userId,
+    actorId: req.auth.userId,
     memberId: req.params.memberId,
   });
   res.status(204).send();

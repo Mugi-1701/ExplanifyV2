@@ -1,6 +1,7 @@
 const { AppError } = require("../../utils/AppError");
 const { slugify } = require("../auth/auth.utils");
 const { getMembership } = require("../organizations/organization.repository");
+const { recordEventSafely } = require("../events/service");
 const {
   createProject,
   findProjectById,
@@ -162,6 +163,20 @@ const createProjectService = async ({
     dueDate,
   });
 
+  recordEventSafely({
+    organizationId: orgId,
+    userId,
+    projectId: project.id,
+    eventType: "PROJECT_CREATED",
+    entityType: "Project",
+    entityId: project.id,
+    metadata: {
+      name,
+      slug: resolvedSlug,
+      status: status ?? "ACTIVE",
+    },
+  });
+
   return attachStats(project);
 };
 
@@ -195,6 +210,19 @@ const updateProjectService = async ({ projectId, userId, data }) => {
   }
 
   const updatedProject = await updateProject(projectId, updateData);
+
+  recordEventSafely({
+    organizationId: project.orgId,
+    userId,
+    projectId,
+    eventType: "PROJECT_UPDATED",
+    entityType: "Project",
+    entityId: projectId,
+    metadata: {
+      changes: updateData,
+    },
+  });
+
   return attachStats(updatedProject);
 };
 
@@ -231,12 +259,28 @@ const addProjectMemberService = async ({ projectId, userId, actorId, data }) => 
   }
 
   const role = data.role || "MEMBER";
-  return addProjectMember({
+  const member = await addProjectMember({
     projectId,
     userId: data.userId,
     role,
     skills: data.skills ?? [],
   });
+
+  recordEventSafely({
+    organizationId: project.orgId,
+    userId: actorId,
+    projectId,
+    eventType: "MEMBER_ADDED",
+    entityType: "ProjectMember",
+    entityId: member.id,
+    metadata: {
+      memberId: data.userId,
+      role,
+      skills: data.skills ?? [],
+    },
+  });
+
+  return member;
 };
 
 const updateProjectMemberService = async ({ projectId, userId, actorId, data }) => {
@@ -277,6 +321,19 @@ const removeProjectMemberService = async ({ projectId, userId, actorId }) => {
   }
 
   await removeProjectMember(projectId, userId);
+
+  recordEventSafely({
+    organizationId: project.orgId,
+    userId: actorId,
+    projectId,
+    eventType: "MEMBER_REMOVED",
+    entityType: "ProjectMember",
+    entityId: userId,
+    metadata: {
+      memberId: userId,
+    },
+  });
+
   return { message: "Project member removed successfully" };
 };
 

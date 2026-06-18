@@ -64,7 +64,7 @@ async function getTaskById(req, res, next) {
 
 async function updateTask(req, res, next) {
   try {
-    const updatedTask = await taskService.updateTask(req.params.taskId, req.body);
+    const updatedTask = await taskService.updateTask(req.params.taskId, req.body, req.auth?.userId);
 
     return res.status(200).json(updatedTask);
   } catch (error) {
@@ -96,7 +96,7 @@ async function addDependency(req, res, next) {
       });
     }
 
-    const dependency = await taskService.addDependency(taskId, dependsOnTaskId);
+    const dependency = await taskService.addDependency(taskId, dependsOnTaskId, req.auth?.userId);
     return res.status(201).json(dependency);
   } catch (error) {
     next(error);
@@ -116,7 +116,7 @@ async function getDependencies(req, res, next) {
 async function removeDependency(req, res, next) {
   try {
     const dependencyId = req.params.dependencyId;
-    await taskService.removeDependency(dependencyId);
+    await taskService.removeDependency(dependencyId, req.auth?.userId);
     return res.status(204).send();
   } catch (error) {
     next(error);

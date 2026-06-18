@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 
 import { ProjectCard } from "@/components/projects/project-card";
@@ -22,9 +23,11 @@ import { getUsers, type WorkspaceUser } from "@/services/users.service";
 import { useProjects } from "@/hooks/use-projects";
 import { getApiErrorMessage } from "@/lib/api-errors";
 import { getActiveOrgIdFromAccessToken } from "@/lib/token";
+import { queryKeys } from "@/lib/query-client";
 import type { CreateProjectInput, ProjectMember, ProjectStats as ProjectStatsData, ProjectWithStats, UpdateProjectInput } from "@/types/project";
 
 function ProjectsPage() {
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const { projects, activeProjectId, selectedProject, loading, error, refresh, selectProject, createNewProject, updateExistingProject, removeProject } = useProjects();
   const [search, setSearch] = useState("");
@@ -147,16 +150,46 @@ function ProjectsPage() {
     });
   }
 
+  const removeMemberMutation = useMutation({
+    mutationFn: async ({ projectId, userId }: { projectId: string; userId: string }) => {
+      await removeProjectMember(projectId, userId);
+      return { projectId, userId };
+    },
+    onMutate: async ({ projectId, userId }) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.projects });
+
+      const previousProjects = queryClient.getQueryData<ProjectWithStats[]>(queryKeys.projects) ?? [];
+      const nextProjects = previousProjects.map((project) =>
+        project.id === projectId
+          ? {
+              ...project,
+              members: (project.members ?? []).filter((member) => member.userId !== userId),
+            }
+          : project
+      );
+
+      queryClient.setQueryData(queryKeys.projects, nextProjects);
+
+      return { previousProjects };
+    },
+    onError: (_, __, context) => {
+      if (context?.previousProjects) {
+        queryClient.setQueryData(queryKeys.projects, context.previousProjects);
+      }
+    },
+    onSuccess: () => {
+      setRemovingMember(null);
+      toast({
+        title: "Member removed",
+        description: "Project membership deleted.",
+        variant: "success",
+      });
+    },
+  });
+
   async function handleRemoveMember(member: { userId: string; user?: { name?: string | null } }) {
     if (!selectedProject) return;
-    await removeProjectMember(selectedProject.id, member.userId);
-    setRemovingMember(null);
-    await refresh();
-    toast({
-      title: "Member removed",
-      description: "Project membership deleted.",
-      variant: "success",
-    });
+    await removeMemberMutation.mutateAsync({ projectId: selectedProject.id, userId: member.userId });
   }
 
   useEffect(() => {
@@ -269,9 +302,9 @@ function ProjectsPage() {
                 setEditingMember(member);
                 setIsMemberOpen(true);
               }}
-              onRemoveMember={(member) => setRemovingMember(member)}
-            />
-          </div>
+            onRemoveMember={(member) => setRemovingMember(member)}
+          />
+        </div>
         </div>
 
         <ProjectFormModal
@@ -302,22 +335,35 @@ function ProjectsPage() {
 
         <Dialog
           open={Boolean(removingMember)}
-          onOpenChange={(nextOpen) => !nextOpen && setRemovingMember(null)}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) {
+              setRemovingMember(null);
+            }
+          }}
           title="Remove member"
           description={`Remove ${removingMember?.user?.name ?? "this member"} from the project? This only removes their project membership.`}
           size="md"
         >
           <div className="flex justify-end gap-3">
-            <Button type="button" variant="outline" onClick={() => setRemovingMember(null)} className="rounded-2xl border-white/10 bg-white/5 text-white hover:bg-white/10">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setRemovingMember(null);
+              }}
+              disabled={removeMemberMutation.isPending}
+              className="rounded-2xl border-white/10 bg-white/5 text-white hover:bg-white/10 disabled:opacity-50"
+            >
               Cancel
             </Button>
             <Button
               type="button"
               variant="outline"
               onClick={() => removingMember && void handleRemoveMember(removingMember)}
-              className="rounded-2xl border-red-400/15 bg-red-500/10 text-red-100 hover:bg-red-500/20"
+              disabled={removeMemberMutation.isPending}
+              className="rounded-2xl border-red-400/15 bg-red-500/10 text-red-100 hover:bg-red-500/20 disabled:opacity-50"
             >
-              Remove
+              {removeMemberMutation.isPending ? "Removing..." : "Remove"}
             </Button>
           </div>
         </Dialog>

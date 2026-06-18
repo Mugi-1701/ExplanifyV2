@@ -3,6 +3,7 @@ const taskRepository = require("./task.repository");
 const { prisma } = require("../../lib/prisma");
 const { computeCoordinationState, getTaskBlockingState } = require("./utils/getTaskBlockingState");
 const coordinationService = require("./coordination.service");
+const { recordEventSafely } = require("../events/service");
 
 /**
  * Recalculate blocked state for a single task and persist status changes
@@ -33,12 +34,6 @@ async function recalcAndPersistBlockedState(taskId) {
  * CREATE TASK
  */
 async function createTask(orgId, userId, data) {
-  console.log("[taskService.createTask] incoming payload", {
-    title: data.title,
-    projectId: data.projectId,
-    dependsOnTaskId: data.dependsOnTaskId,
-  });
-
   const project = await prisma.project.findFirst({
     where: {
       id: data.projectId,
@@ -71,6 +66,35 @@ async function createTask(orgId, userId, data) {
     aiRecommendationExplanation: data.aiRecommendationExplanation,
   });
 
+  recordEventSafely({
+    organizationId: orgId,
+    userId,
+    eventType: "TASK_CREATED",
+    entityType: "Task",
+    entityId: created.id,
+    projectId: created.projectId,
+    metadata: {
+      taskTitle: created.title,
+      priority: created.priority,
+      assigneeId: created.assigneeId ?? null,
+    },
+  });
+
+  if (created.assigneeId) {
+    recordEventSafely({
+      organizationId: orgId,
+      userId,
+      eventType: "TASK_ASSIGNED",
+      entityType: "Task",
+      entityId: created.id,
+      projectId: created.projectId,
+      metadata: {
+        oldAssigneeId: null,
+        newAssigneeId: created.assigneeId,
+      },
+    });
+  }
+
   // If dependsOnTaskId provided, create dependency relationship
   if (data.dependsOnTaskId) {
     if (created.id === data.dependsOnTaskId) {
@@ -90,7 +114,20 @@ async function createTask(orgId, userId, data) {
     }
 
     // Create the dependency
-    await taskRepository.createDependency(created.id, data.dependsOnTaskId);
+    const dependency = await taskRepository.createDependency(created.id, data.dependsOnTaskId);
+
+    recordEventSafely({
+      organizationId: orgId,
+      userId,
+      eventType: "DEPENDENCY_CREATED",
+      entityType: "TaskDependency",
+      entityId: dependency.id,
+      projectId: created.projectId,
+      metadata: {
+        taskId: created.id,
+        dependsOnTaskId: data.dependsOnTaskId,
+      },
+    });
   }
 
   // Ensure blocked state reflects any dependencies (if present)
@@ -99,17 +136,6 @@ async function createTask(orgId, userId, data) {
   // return enriched task
   const task = await taskRepository.getTaskById(created.id);
   const computed = computeCoordinationState(task);
-  console.log("[taskService.createTask] persisted task", {
-    id: task?.id,
-    title: task?.title,
-    status: task?.status,
-    dependencies: task?.dependencies,
-    dependencyIds: task?.dependencies?.map((dependency) => dependency.dependsOnTaskId) ?? [],
-    dependencyCount: task?.dependencies?.length ?? 0,
-    blockingTaskCount: computed.blockingTasks.length,
-    isBlocked: computed.isBlocked,
-    coordinationState: computed.coordinationState,
-  });
   return {
     ...task,
     isBlocked: computed.isBlocked,
@@ -138,12 +164,6 @@ async function getTasksByProject(orgId, projectId, filters = {}) {
   }
 
   const tasks = await taskRepository.getTasksByProject(projectId, filters);
-  console.log("[taskService.getTasksByProject] fetched tasks", tasks.map((task) => ({
-    id: task.id,
-    title: task.title,
-    status: task.status,
-    dependencyCount: task.dependencies?.length ?? 0,
-  })));
 
   // enrich tasks with blocked state using available dependency data (batched)
   const enriched = tasks.map((t) => {
@@ -187,7 +207,7 @@ async function getTaskById(taskId) {
 /**
  * UPDATE TASK
  */
-async function updateTask(taskId, data) {
+async function updateTask(taskId, data, userId) {
   if (!taskId) {
     throw new AppError("Task ID is required", 400);
   }
@@ -198,7 +218,77 @@ async function updateTask(taskId, data) {
     throw new AppError("Task not found", 404);
   }
 
-  await taskRepository.updateTask(taskId, data);
+  const updatedTask = await taskRepository.updateTask(taskId, data);
+
+  const actorId = userId ?? existingTask.createdById;
+  const eventsToPublish = [];
+  const hasStatusChange =
+    data.status !== undefined && data.status !== existingTask.status;
+  const hasAssigneeChange =
+    data.assigneeId !== undefined && data.assigneeId !== existingTask.assigneeId;
+
+  if (hasStatusChange) {
+    eventsToPublish.push({
+      organizationId: existingTask.organizationId,
+      userId: actorId,
+      projectId: existingTask.projectId,
+      eventType: "TASK_STATUS_CHANGED",
+      entityType: "Task",
+      entityId: taskId,
+      metadata: {
+        oldStatus: existingTask.status,
+        newStatus: data.status,
+      },
+    });
+  }
+
+  if (hasAssigneeChange) {
+    eventsToPublish.push({
+      organizationId: existingTask.organizationId,
+      userId: actorId,
+      projectId: existingTask.projectId,
+      eventType: "TASK_ASSIGNED",
+      entityType: "Task",
+      entityId: taskId,
+      metadata: {
+        oldAssigneeId: existingTask.assigneeId ?? null,
+        newAssigneeId: data.assigneeId ?? null,
+      },
+    });
+  }
+
+  if (!hasStatusChange && !hasAssigneeChange) {
+    eventsToPublish.push({
+      organizationId: existingTask.organizationId,
+      userId: actorId,
+      projectId: existingTask.projectId,
+      eventType: "TASK_UPDATED",
+      entityType: "Task",
+      entityId: taskId,
+      metadata: {
+        changes: data,
+      },
+    });
+  }
+
+  if (data.status === "DONE" && existingTask.status !== "DONE") {
+    eventsToPublish.push({
+      organizationId: existingTask.organizationId,
+      userId: actorId,
+      projectId: existingTask.projectId,
+      eventType: "TASK_COMPLETED",
+      entityType: "Task",
+      entityId: taskId,
+      metadata: {
+        oldStatus: existingTask.status,
+        newStatus: data.status,
+      },
+    });
+  }
+
+  for (const event of eventsToPublish) {
+    recordEventSafely(event);
+  }
 
   // If status changed, recalc dependents' blocked state
   if (data.status) {
@@ -246,6 +336,20 @@ async function deleteTask(taskId) {
 
   const dependentTaskIds = (existingTask.dependents || []).map((dependency) => dependency.task?.id).filter(Boolean);
 
+  recordEventSafely({
+    organizationId: existingTask.organizationId,
+    userId: existingTask.createdById,
+    projectId: existingTask.projectId,
+    eventType: "TASK_DELETED",
+    entityType: "Task",
+    entityId: taskId,
+    metadata: {
+      taskTitle: existingTask.title,
+      projectId: existingTask.projectId,
+      assigneeId: existingTask.assigneeId ?? null,
+    },
+  });
+
   const deletedTask = await taskRepository.deleteTask(taskId);
 
   for (const dependentTaskId of dependentTaskIds) {
@@ -258,7 +362,7 @@ async function deleteTask(taskId) {
 /**
  * ADD DEPENDENCY
  */
-async function addDependency(taskId, dependsOnTaskId) {
+async function addDependency(taskId, dependsOnTaskId, userId) {
   if (!taskId) {
     throw new AppError("Task ID is required", 400);
   }
@@ -286,6 +390,19 @@ async function addDependency(taskId, dependsOnTaskId) {
 
   const created = await taskRepository.createDependency(taskId, dependsOnTaskId);
 
+  recordEventSafely({
+    organizationId: task.organizationId,
+    userId: userId ?? task.createdById,
+    projectId: task.projectId,
+    eventType: "DEPENDENCY_CREATED",
+    entityType: "TaskDependency",
+    entityId: created.id,
+    metadata: {
+      taskId,
+      dependsOnTaskId,
+    },
+  });
+
   // After adding dependency, task becomes blocked if dependency incomplete
   await recalcAndPersistBlockedState(taskId);
 
@@ -295,7 +412,7 @@ async function addDependency(taskId, dependsOnTaskId) {
 /**
  * REMOVE DEPENDENCY
  */
-async function removeDependency(dependencyId) {
+async function removeDependency(dependencyId, userId) {
   if (!dependencyId) {
     throw new AppError("Dependency ID is required", 400);
   }
@@ -307,6 +424,19 @@ async function removeDependency(dependencyId) {
   }
 
   await taskRepository.removeDependency(dependencyId);
+
+  recordEventSafely({
+    organizationId: dependency.task?.organizationId,
+    userId: userId ?? dependency.task?.createdById,
+    projectId: dependency.task?.projectId,
+    eventType: "DEPENDENCY_REMOVED",
+    entityType: "TaskDependency",
+    entityId: dependencyId,
+    metadata: {
+      taskId: dependency.taskId,
+      dependsOnTaskId: dependency.dependsOnTaskId,
+    },
+  });
 
   // Recalc blocked state for the owning task
   await recalcAndPersistBlockedState(dependency.taskId);

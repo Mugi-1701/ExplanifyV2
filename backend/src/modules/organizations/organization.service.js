@@ -14,6 +14,7 @@ const { AppError } = require("../../utils/AppError");
 const { slugify } = require("../auth/auth.utils");
 const { randomBytes } = require("crypto");
 const bcrypt = require("bcryptjs");
+const { recordEventSafely } = require("../events/service");
 
 const createOrg = async ({ userId, name }) => {
   const slug = `${slugify(name)}-${userId.slice(0, 6)}`;
@@ -73,15 +74,41 @@ const inviteMember = async ({ orgId, userId, email, role, expiresInDays = 7 }) =
   return { invite, token };
 };
 
-const addMemberToOrg = async ({ orgId, userId, role }) => {
-  return addMember({ orgId, userId, role });
+const addMemberToOrg = async ({ orgId, userId, role, actorId }) => {
+  const membership = await addMember({ orgId, userId, role });
+
+  recordEventSafely({
+    organizationId: orgId,
+    userId: actorId,
+    eventType: "MEMBER_ADDED",
+    entityType: "OrganizationMember",
+    entityId: membership.id,
+    metadata: {
+      role,
+    },
+  });
+
+  return membership;
 };
 
-const removeMemberFromOrg = async ({ orgId, userId, memberId }) => {
-  if (userId === memberId) {
+const removeMemberFromOrg = async ({ orgId, userId, memberId, actorId }) => {
+  if (actorId === memberId) {
     throw new AppError("Cannot remove yourself", 400);
   }
-  return removeMember({ orgId, userId: memberId });
+  const removed = await removeMember({ orgId, userId: memberId });
+
+  recordEventSafely({
+    organizationId: orgId,
+    userId: actorId,
+    eventType: "MEMBER_REMOVED",
+    entityType: "OrganizationMember",
+    entityId: memberId,
+    metadata: {
+      memberId,
+    },
+  });
+
+  return removed;
 };
 
 const listOrgMembers = async ({ orgId, userId }) => {

@@ -8,6 +8,7 @@ const teamsRoutes = require("../modules/teams/routes");
 const aiRoutes = require("../modules/ai/routes");
 const aiExplanationsRoutes = require("../modules/ai-explanations/routes");
 const notificationsRoutes = require("../modules/notifications/routes");
+const eventsRoutes = require("../modules/events/routes");
 
 const router = express.Router();
 
@@ -24,5 +25,6 @@ router.use("/teams", teamsRoutes);
 router.use("/", aiRoutes);
 router.use("/ai-explanations", aiExplanationsRoutes);
 router.use("/notifications", notificationsRoutes);
+router.use("/events", eventsRoutes);
 
 module.exports = router;

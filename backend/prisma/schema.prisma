@@ -83,6 +83,23 @@ enum ActivityType {
   AI_EXPLANATION_CREATED
 }
 
+enum EventType {
+  PROJECT_CREATED
+  PROJECT_UPDATED
+
+  TASK_CREATED
+  TASK_UPDATED
+  TASK_COMPLETED
+  TASK_ASSIGNED
+  TASK_DELETED
+
+  MEMBER_ADDED
+  MEMBER_REMOVED
+
+  DEPENDENCY_CREATED
+  DEPENDENCY_REMOVED
+}
+
 enum AITargetType {
   PROJECT
   TASK
@@ -220,6 +237,7 @@ model Project {
   members      ProjectMember[]
   tasks        Task[]
   activities   ProjectActivity[]
+  events       EventLog[]
   aiOutputs    AIExplanation[]
 
   @@index([orgId, status])
@@ -354,20 +372,23 @@ model Notification {
 
 model EventLog {
   id         String   @id @default(uuid())
-  orgId      String
-  actorId    String?
+  organizationId String
+  projectId  String?
+  userId     String?
+  eventType  EventType
   entityType String
   entityId   String
-  eventType  String
-  payload    Json
+  metadata   Json
   createdAt  DateTime @default(now())
 
-  organization Organization    @relation(fields: [orgId], references: [id])
-  actor        User?           @relation("EventLogActor", fields: [actorId], references: [id])
+  organization Organization    @relation(fields: [organizationId], references: [id])
+  user        User?            @relation("EventLogActor", fields: [userId], references: [id])
+  project     Project?         @relation(fields: [projectId], references: [id])
   // AI explanations generated from this event
   aiOutputs    AIExplanation[] @relation("EventLogAIOutputs")
 
-  @@index([orgId, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([projectId, createdAt])
   @@index([entityType, entityId])
 }
 
