@@ -4,6 +4,7 @@ import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { getApiErrorMessage } from "@/lib/api-errors";
@@ -71,6 +72,14 @@ function getDependencySummary(nodes: ReturnType<typeof getTaskDependencyNodes>) 
   return nodes.length > 0 ? "Dependencies detected." : "No dependencies detected.\nTask can proceed independently.";
 }
 
+function getConfidenceLabel(confidence?: Task["aiRecommendationConfidence"]) {
+  if (!confidence) {
+    return "Unknown";
+  }
+
+  return confidence.charAt(0) + confidence.slice(1).toLowerCase();
+}
+
 function TaskDetailModal({ open, task, assignees, onClose, onSubmit, onDelete }: TaskDetailModalProps) {
   const { toast } = useToast();
   const [mode, setMode] = useState<"view" | "edit">("view");
@@ -91,6 +100,14 @@ function TaskDetailModal({ open, task, assignees, onClose, onSubmit, onDelete }:
   const manualOverride = Boolean(task?.priority && task?.priority !== suggestedPriority);
   const coordinationExplanation = getCoordinationExplanation(task);
   const dependencySummary = getDependencySummary(dependencyNodes);
+  const showAiAssignmentDecision = Boolean(task?.aiRecommendedUserId);
+  const recommendedAssignee = useMemo(
+    () => assignees.find((assignee) => assignee.id === task?.aiRecommendedUserId) ?? null,
+    [assignees, task?.aiRecommendedUserId]
+  );
+  const recommendedAssigneeLabel = recommendedAssignee
+    ? recommendedAssignee.name
+    : "Unknown User";
 
   useEffect(() => {
     if (!open || !task) return;
@@ -208,6 +225,47 @@ function TaskDetailModal({ open, task, assignees, onClose, onSubmit, onDelete }:
           </div>
           <div className="rounded-2xl border border-blue-400/15 bg-blue-500/10 p-4"><p className="text-xs font-medium uppercase tracking-[0.18em] text-blue-200">Priority Intelligence</p><p className="mt-2 text-sm leading-6 text-white/75">Priority: <span className="font-semibold text-white">{task.priority ?? "MEDIUM"}</span><br />{manualOverride ? "Manually overridden by user." : `AI Suggested because: ${getPriorityReason(task.dueDate)}`}</p></div>
           <div className="rounded-2xl border border-blue-400/15 bg-blue-500/10 p-4"><p className="text-xs font-medium uppercase tracking-[0.18em] text-blue-200">Coordination</p><p className="mt-2 text-sm leading-6 text-white/75">{coordinationExplanation}</p></div>
+          {showAiAssignmentDecision ? (
+            <div className="rounded-2xl border border-violet-400/20 bg-violet-500/10 p-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-xs font-medium uppercase tracking-[0.18em] text-violet-100">AI Assignment Decision</p>
+                <Badge variant="purple">AI</Badge>
+                {task.aiRecommendationConfidence ? (
+                  <Badge variant={task.aiRecommendationConfidence === "HIGH" ? "success" : task.aiRecommendationConfidence === "MEDIUM" ? "warning" : "muted"}>
+                    Confidence: {getConfidenceLabel(task.aiRecommendationConfidence)}
+                  </Badge>
+                ) : null}
+                {typeof task.aiRecommendationScore === "number" ? <Badge variant="blue">Score: {task.aiRecommendationScore}</Badge> : null}
+              </div>
+
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-white/40">Recommended User</p>
+                  <p className="mt-1 text-sm text-white/85">{recommendedAssigneeLabel}</p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-white/40">Confidence</p>
+                  <p className="mt-1 text-sm text-white/85">{task.aiRecommendationConfidence ? getConfidenceLabel(task.aiRecommendationConfidence) : "Unknown"}</p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-white/40">Score</p>
+                  <p className="mt-1 text-sm text-white/85">{typeof task.aiRecommendationScore === "number" ? task.aiRecommendationScore : "Unknown"}</p>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-white/40">Explanation</p>
+                <ul className="mt-2 space-y-2 text-sm text-white/75">
+                  {(task.aiRecommendationExplanation ?? []).map((item) => (
+                    <li key={item} className="flex gap-2">
+                      <span className="text-emerald-300">✓</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          ) : null}
           <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
             <div className="mb-2 flex items-center justify-between"><p className="text-xs font-medium uppercase tracking-[0.18em] text-white/40">Dependency State</p></div>
             {dependencyNodes.length > 0 ? (

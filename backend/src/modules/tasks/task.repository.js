@@ -35,6 +35,15 @@ async function createTask(data) {
       ...(data.assigneeId && {
         assigneeId: data.assigneeId,
       }),
+      ...(data.aiRecommendedUserId && {
+        aiRecommendedUserId: data.aiRecommendedUserId,
+      }),
+      aiRecommendationScore:
+        data.aiRecommendationScore ?? null,
+      aiRecommendationConfidence:
+        data.aiRecommendationConfidence ?? null,
+      aiRecommendationExplanation:
+        data.aiRecommendationExplanation ?? null,
     },
 
     include: {

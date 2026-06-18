@@ -2,12 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type React from "react";
+import { useMutation } from "@tanstack/react-query";
 
+import { AIRecommendationCard } from "@/components/tasks/ai-recommendation-card";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { DependencySelect } from "./dependency-select";
 import { getApiErrorMessage } from "@/lib/api-errors";
+import { recommendAssignee } from "@/services/ai.service";
+import type { AIRecommendationData, AIRecommendationPayload } from "@/types/ai";
 import type { CreateTaskInput, Task } from "@/types/task";
 
 type TaskCreateValues = {
@@ -18,6 +22,7 @@ type TaskCreateValues = {
   dueDate: string;
   estimateHours: string;
   assigneeId: string;
+  requiredSkills: string[];
 };
 
 type TaskCreateModalProps = {
@@ -30,6 +35,7 @@ type TaskCreateModalProps = {
 };
 
 const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const;
+const SKILLS = ["Frontend", "Backend", "AI/ML", "UI/UX", "Testing", "DevOps"] as const;
 
 function getSuggestedPriority(dueDate: string) {
   if (!dueDate) return "MEDIUM" as const;
@@ -77,6 +83,7 @@ function TaskCreateModal({ open, tasks, assignees, projectId, onClose, onSubmit 
       dueDate: "",
       estimateHours: "",
       assigneeId: "",
+      requiredSkills: [],
     }),
     []
   );
@@ -84,16 +91,49 @@ function TaskCreateModal({ open, tasks, assignees, projectId, onClose, onSubmit 
   const [manualOverride, setManualOverride] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [recommendationError, setRecommendationError] = useState<string | null>(null);
+  const [recommendation, setRecommendation] = useState<AIRecommendationData | null>(null);
+  const [recommendationApplied, setRecommendationApplied] = useState(false);
+  const [appliedRecommendationPayload, setAppliedRecommendationPayload] = useState<AIRecommendationPayload | null>(null);
 
   const suggestedPriority = useMemo(() => getSuggestedPriority(values.dueDate), [values.dueDate]);
   const effectivePriority = manualOverride ? values.priority : suggestedPriority;
   const priorityReason = useMemo(() => getPriorityReason(values.dueDate), [values.dueDate]);
+  const recommendationMutation = useMutation({
+    mutationFn: async () => {
+      if (!projectId) {
+        throw new Error("projectId is required");
+      }
+
+      return recommendAssignee(projectId, values.requiredSkills);
+    },
+    onMutate: () => {
+      setRecommendationError(null);
+      setRecommendationApplied(false);
+      setAppliedRecommendationPayload(null);
+    },
+    onSuccess: (data) => {
+      setRecommendation(data);
+      setRecommendationApplied(false);
+      setAppliedRecommendationPayload(null);
+    },
+    onError: (recommendError) => {
+      setRecommendation(null);
+      setRecommendationApplied(false);
+      setAppliedRecommendationPayload(null);
+      setRecommendationError(getApiErrorMessage(recommendError, "Unable to get AI recommendation."));
+    },
+  });
 
   useEffect(() => {
     if (!open) return;
     setValues(initialValues);
     setManualOverride(false);
     setError(null);
+    setRecommendation(null);
+    setRecommendationError(null);
+    setRecommendationApplied(false);
+    setAppliedRecommendationPayload(null);
   }, [initialValues, open]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -113,6 +153,7 @@ function TaskCreateModal({ open, tasks, assignees, projectId, onClose, onSubmit 
         dueDate: values.dueDate || undefined,
         estimateHours: values.estimateHours ? Number(values.estimateHours) : undefined,
         assigneeId: values.assigneeId || undefined,
+        ...(appliedRecommendationPayload ?? {}),
       });
       onClose();
     } catch (createError) {
@@ -120,6 +161,21 @@ function TaskCreateModal({ open, tasks, assignees, projectId, onClose, onSubmit 
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function handleUseRecommendation() {
+    if (!recommendation) {
+      return;
+    }
+
+    setValues((current) => ({ ...current, assigneeId: recommendation.recommendedUserId }));
+    setRecommendationApplied(true);
+    setAppliedRecommendationPayload({
+      aiRecommendedUserId: recommendation.recommendedUserId,
+      aiRecommendationScore: recommendation.score,
+      aiRecommendationConfidence: recommendation.confidence.toUpperCase() as "LOW" | "MEDIUM" | "HIGH",
+      aiRecommendationExplanation: recommendation.explanation,
+    });
   }
 
   return (
@@ -162,6 +218,57 @@ function TaskCreateModal({ open, tasks, assignees, projectId, onClose, onSubmit 
             ))}
           </select>
         </label>
+
+        <div className="space-y-3 md:col-span-2">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-1">
+              <span className="text-xs uppercase tracking-[0.18em] text-white/45">Required Skills</span>
+              <p className="text-sm text-white/55">Choose the skills this task needs, then ask AI for a recommended assignee.</p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void recommendationMutation.mutate()}
+              disabled={recommendationMutation.isPending || !projectId}
+              className="rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10"
+            >
+              {recommendationMutation.isPending ? "AI analyzing..." : "AI Recommend"}
+            </Button>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {SKILLS.map((skill) => {
+              const selected = values.requiredSkills.includes(skill);
+              return (
+                <button
+                  key={skill}
+                  type="button"
+                  onClick={() =>
+                    setValues((current) => ({
+                      ...current,
+                      requiredSkills: selected
+                        ? current.requiredSkills.filter((item) => item !== skill)
+                        : [...current.requiredSkills, skill],
+                    }))
+                  }
+                  className={`rounded-full border px-3 py-2 text-xs font-medium transition ${
+                    selected ? "border-violet-400/30 bg-violet-500/15 text-violet-100" : "border-white/10 bg-white/5 text-white/65 hover:bg-white/10"
+                  }`}
+                >
+                  {skill}
+                </button>
+              );
+            })}
+          </div>
+
+          <AIRecommendationCard
+            recommendation={recommendation}
+            loading={recommendationMutation.isPending}
+            error={recommendationError}
+            applied={recommendationApplied}
+            onUseRecommendation={handleUseRecommendation}
+          />
+        </div>
 
         <label className="space-y-2 text-sm text-white/65">
           <span className="text-xs uppercase tracking-[0.18em] text-white/45">Deadline</span>

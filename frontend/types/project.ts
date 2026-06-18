@@ -57,6 +57,7 @@ export type Project = {
   organization?: ProjectOrganization;
   members?: ProjectMember[];
   tasks?: ProjectTask[];
+  progressPercentage?: number;
   stats?: ProjectStats;
 };
 
@@ -65,6 +66,7 @@ export type ProjectStats = {
   completedTaskCount: number;
   blockedTaskCount: number;
   activeTaskCount: number;
+  progressPercentage: number;
   coordinationHealth: "HEALTHY" | "READY" | "WARNING" | "BLOCKED" | "EMPTY";
   coordinationReason: string;
 };

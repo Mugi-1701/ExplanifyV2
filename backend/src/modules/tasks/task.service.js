@@ -65,6 +65,10 @@ async function createTask(orgId, userId, data) {
     projectId: data.projectId,
     createdById: userId,
     assigneeId: data.assigneeId,
+    aiRecommendedUserId: data.aiRecommendedUserId,
+    aiRecommendationScore: data.aiRecommendationScore,
+    aiRecommendationConfidence: data.aiRecommendationConfidence,
+    aiRecommendationExplanation: data.aiRecommendationExplanation,
   });
 
   // If dependsOnTaskId provided, create dependency relationship

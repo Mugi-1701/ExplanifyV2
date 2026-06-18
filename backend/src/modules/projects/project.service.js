@@ -20,8 +20,19 @@ const EMPTY_STATS = {
   completedTaskCount: 0,
   blockedTaskCount: 0,
   activeTaskCount: 0,
+  progressPercentage: 0,
   coordinationHealth: "EMPTY",
   coordinationReason: "No tasks yet",
+};
+
+const calculateProgressPercentage = (tasks = []) => {
+  const totalTasks = tasks.length;
+  if (totalTasks === 0) {
+    return 0;
+  }
+
+  const completedTasks = tasks.filter((task) => task.status === "DONE").length;
+  return Math.round((completedTasks / totalTasks) * 100);
 };
 
 const assertMembership = async ({ orgId, userId }) => {
@@ -59,6 +70,7 @@ const buildProjectStats = (tasks = []) => {
   const completedTaskCount = tasks.filter((task) => task.status === "DONE").length;
   const blockedTaskCount = tasks.filter(isTaskBlocked).length;
   const activeTaskCount = tasks.filter((task) => task.status === "IN_PROGRESS").length;
+  const progressPercentage = calculateProgressPercentage(tasks);
 
   if (blockedTaskCount > 0) {
     return {
@@ -66,6 +78,7 @@ const buildProjectStats = (tasks = []) => {
       completedTaskCount,
       blockedTaskCount,
       activeTaskCount,
+      progressPercentage,
       coordinationHealth: "BLOCKED",
       coordinationReason: `${blockedTaskCount} task${blockedTaskCount === 1 ? " is" : "s are"} waiting on dependencies`,
     };
@@ -77,6 +90,7 @@ const buildProjectStats = (tasks = []) => {
       completedTaskCount,
       blockedTaskCount,
       activeTaskCount,
+      progressPercentage,
       coordinationHealth: "HEALTHY",
       coordinationReason: "All dependencies completed",
     };
@@ -88,6 +102,7 @@ const buildProjectStats = (tasks = []) => {
       completedTaskCount,
       blockedTaskCount,
       activeTaskCount,
+      progressPercentage,
       coordinationHealth: "READY",
       coordinationReason: "Active execution in progress",
     };
@@ -98,6 +113,7 @@ const buildProjectStats = (tasks = []) => {
     completedTaskCount,
     blockedTaskCount,
     activeTaskCount,
+    progressPercentage,
     coordinationHealth: "READY",
     coordinationReason: "Ready to start",
   };
@@ -109,9 +125,11 @@ const attachStats = (project) => {
   }
 
   const { tasks = [], ...projectData } = project;
+  const stats = buildProjectStats(tasks);
   return {
     ...projectData,
-    stats: buildProjectStats(tasks),
+    progressPercentage: stats.progressPercentage,
+    stats,
     members: project.members ?? [],
     tasks,
   };

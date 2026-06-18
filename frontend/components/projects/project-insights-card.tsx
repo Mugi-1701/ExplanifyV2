@@ -28,6 +28,7 @@ function ProjectInsightsCard({ project, activeTab, onTabChange, onAddMember, onE
 
   const members = project.members ?? [];
   const tasks = project.tasks ?? [];
+  const progress = project.progressPercentage ?? project.stats.progressPercentage;
 
   return (
     <Card className="border-white/10 bg-white/[0.03]">
@@ -82,6 +83,24 @@ function ProjectInsightsCard({ project, activeTab, onTabChange, onAddMember, onE
               <div>Tasks: {project.stats.taskCount}</div>
               <div>Blocked tasks: {project.stats.blockedTaskCount}</div>
               <div>Team members: {members.length}</div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <div className="flex items-end justify-between gap-3">
+                <div>
+                  <p className="text-sm text-white/55">Progress</p>
+                  <p className="mt-1 text-3xl font-semibold text-white">{progress}%</p>
+                </div>
+                <p className="text-sm text-white/50">
+                  {project.stats.completedTaskCount}/{project.stats.taskCount} tasks done
+                </p>
+              </div>
+              <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-violet-400 via-blue-400 to-emerald-400 transition-all duration-300"
+                  style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
+                />
+              </div>
             </div>
           </>
         ) : null}

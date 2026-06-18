@@ -34,6 +34,10 @@ export type Task = {
   projectId?: string | null;
   organizationId?: string | null;
   assigneeId?: string | null;
+  aiRecommendedUserId?: string | null;
+  aiRecommendationScore?: number | null;
+  aiRecommendationConfidence?: "LOW" | "MEDIUM" | "HIGH" | null;
+  aiRecommendationExplanation?: string[] | null;
   assignee?: {
     id: string;
     name: string;
@@ -59,6 +63,10 @@ export type CreateTaskInput = {
   priority?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
   projectId: string;
   assigneeId?: string;
+  aiRecommendedUserId?: string | null;
+  aiRecommendationScore?: number | null;
+  aiRecommendationConfidence?: "LOW" | "MEDIUM" | "HIGH" | null;
+  aiRecommendationExplanation?: string[] | null;
   estimateHours?: number;
   startDate?: string;
   dueDate?: string;

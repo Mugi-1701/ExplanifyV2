@@ -12,6 +12,10 @@ const createTaskSchema = z.object({
   orgId: z.string().uuid().optional(),
   organizationId: z.string().uuid().optional(),
   assigneeId: z.string().uuid().optional().nullable(),
+  aiRecommendedUserId: z.string().uuid().optional().nullable(),
+  aiRecommendationScore: z.coerce.number().optional().nullable(),
+  aiRecommendationConfidence: z.enum(["LOW", "MEDIUM", "HIGH"]).optional().nullable(),
+  aiRecommendationExplanation: z.array(z.string()).optional().nullable(),
   dependsOnTaskId: z.string().uuid().optional().nullable()
 });
 
@@ -23,7 +27,11 @@ const updateTaskSchema = z.object({
   estimateHours: z.coerce.number().positive().optional().nullable(),
   startDate: z.string().datetime().optional().nullable(),
   dueDate: z.coerce.date().optional().nullable(),
-  assigneeId: z.string().uuid().optional().nullable()
+  assigneeId: z.string().uuid().optional().nullable(),
+  aiRecommendedUserId: z.string().uuid().optional().nullable(),
+  aiRecommendationScore: z.coerce.number().optional().nullable(),
+  aiRecommendationConfidence: z.enum(["LOW", "MEDIUM", "HIGH"]).optional().nullable(),
+  aiRecommendationExplanation: z.array(z.string()).optional().nullable()
 });
 
 const createDependencySchema = z.object({

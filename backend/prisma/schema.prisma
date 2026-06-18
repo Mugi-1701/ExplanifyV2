@@ -109,6 +109,7 @@ model User {
   teamMemberships TeamMember[]
   projectMembers  ProjectMember[]
   assignedTasks   Task[]            @relation("TaskAssignee")
+  aiRecommendedTasks Task[]         @relation("TaskAIRecommendation")
   createdTasks    Task[]            @relation("TaskCreator")
   activities      ProjectActivity[] @relation("ActivityActor")
   notifications   Notification[]    @relation("NotificationRecipient")
@@ -250,6 +251,10 @@ model Task {
   status         TaskStatus   @default(TODO)
   priority       TaskPriority @default(MEDIUM)
   assigneeId     String?
+  aiRecommendedUserId String?
+  aiRecommendationScore Float?
+  aiRecommendationConfidence AIConfidence?
+  aiRecommendationExplanation Json?
   createdById    String
   estimateHours  Float?
   startDate      DateTime?
@@ -260,6 +265,7 @@ model Task {
   organization Organization      @relation(fields: [organizationId], references: [id])
   project      Project           @relation(fields: [projectId], references: [id])
   assignee     User?             @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  aiRecommendedUser User?        @relation("TaskAIRecommendation", fields: [aiRecommendedUserId], references: [id])
   creator      User              @relation("TaskCreator", fields: [createdById], references: [id])
   dependencies TaskDependency[]  @relation("TaskDependencies")
   dependents   TaskDependency[]  @relation("TaskDependents")

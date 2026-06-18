@@ -38,6 +38,7 @@ const EMPTY_STATS: ProjectStats = {
   completedTaskCount: 0,
   blockedTaskCount: 0,
   activeTaskCount: 0,
+  progressPercentage: 0,
   coordinationHealth: "EMPTY",
   coordinationReason: "No tasks yet",
 };
@@ -52,6 +53,7 @@ function normalizeProjectStats(stats?: ProjectStats | null): ProjectStats {
     completedTaskCount: Number(stats.completedTaskCount) || 0,
     blockedTaskCount: Number(stats.blockedTaskCount) || 0,
     activeTaskCount: Number(stats.activeTaskCount) || 0,
+    progressPercentage: Number(stats.progressPercentage) || 0,
     coordinationHealth: stats.coordinationHealth ?? "EMPTY",
     coordinationReason: stats.coordinationReason || "No tasks yet",
   };
@@ -69,6 +71,7 @@ function buildProjectStats(tasks: Task[]): ProjectStats {
   const completedTaskCount = tasks.filter((task) => task.status === "DONE").length;
   const blockedTaskCount = tasks.filter((task) => task.isBlocked || task.status === "BLOCKED").length;
   const activeTaskCount = tasks.filter((task) => task.status === "IN_PROGRESS").length;
+  const progressPercentage = taskCount === 0 ? 0 : Math.round((completedTaskCount / taskCount) * 100);
 
   if (taskCount === 0) {
     return {
@@ -76,6 +79,7 @@ function buildProjectStats(tasks: Task[]): ProjectStats {
       completedTaskCount,
       blockedTaskCount,
       activeTaskCount,
+      progressPercentage,
       coordinationHealth: "EMPTY",
       coordinationReason: "No tasks yet",
     };
@@ -87,6 +91,7 @@ function buildProjectStats(tasks: Task[]): ProjectStats {
       completedTaskCount,
       blockedTaskCount,
       activeTaskCount,
+      progressPercentage,
       coordinationHealth: "BLOCKED",
       coordinationReason: `${blockedTaskCount} task${blockedTaskCount === 1 ? " is" : "s are"} waiting on dependencies`,
     };
@@ -98,6 +103,7 @@ function buildProjectStats(tasks: Task[]): ProjectStats {
       completedTaskCount,
       blockedTaskCount,
       activeTaskCount,
+      progressPercentage,
       coordinationHealth: "HEALTHY",
       coordinationReason: "All dependencies completed",
     };
@@ -109,6 +115,7 @@ function buildProjectStats(tasks: Task[]): ProjectStats {
       completedTaskCount,
       blockedTaskCount,
       activeTaskCount,
+      progressPercentage,
       coordinationHealth: "READY",
       coordinationReason: "Active execution in progress",
     };
@@ -119,6 +126,7 @@ function buildProjectStats(tasks: Task[]): ProjectStats {
     completedTaskCount,
     blockedTaskCount,
     activeTaskCount,
+    progressPercentage,
     coordinationHealth: "READY",
     coordinationReason: "Ready to start",
   };
