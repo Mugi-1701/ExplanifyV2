@@ -73,10 +73,6 @@ async function createProject(input: CreateProjectInput): Promise<Project> {
     throw new Error("orgId is required");
   }
 
-  if (!UUID_PATTERN.test(orgId)) {
-    throw new Error("orgId must be a valid UUID");
-  }
-
   const payload: CreateProjectInput = {
     ...input,
     orgId,

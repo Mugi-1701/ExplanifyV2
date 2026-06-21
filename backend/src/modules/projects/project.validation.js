@@ -11,6 +11,12 @@ const createProjectSchema = z.object({
   teamId: z.string().uuid().optional(),
   startDate: z.coerce.date().optional(),
   dueDate: z.coerce.date().optional(),
+  category: z.string().optional(),
+  priority: z.string().optional(),
+  goal: z.string().optional(),
+  expectedDeliverable: z.string().optional(),
+  estimatedDuration: z.string().optional(),
+  leadId: z.string().uuid().optional(),
 });
 
 const updateProjectSchema = z.object({

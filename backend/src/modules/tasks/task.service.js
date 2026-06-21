@@ -76,6 +76,7 @@ async function createTask(orgId, userId, data) {
     metadata: {
       taskTitle: created.title,
       priority: created.priority,
+      assigneeName: created.assignee?.name ?? null,
       assigneeId: created.assigneeId ?? null,
     },
   });
@@ -89,8 +90,8 @@ async function createTask(orgId, userId, data) {
       entityId: created.id,
       projectId: created.projectId,
       metadata: {
-        oldAssigneeId: null,
-        newAssigneeId: created.assigneeId,
+        oldAssigneeName: null,
+        newAssigneeName: created.assignee?.name ?? null,
       },
     });
   }
@@ -232,12 +233,15 @@ async function updateTask(taskId, data, userId) {
       organizationId: existingTask.organizationId,
       userId: actorId,
       projectId: existingTask.projectId,
-      eventType: "TASK_STATUS_CHANGED",
+      eventType: "TASK_UPDATED",
       entityType: "Task",
       entityId: taskId,
       metadata: {
-        oldStatus: existingTask.status,
-        newStatus: data.status,
+        taskTitle: existingTask.title,
+        status: {
+          from: existingTask.status,
+          to: data.status,
+        },
       },
     });
   }
@@ -251,8 +255,9 @@ async function updateTask(taskId, data, userId) {
       entityType: "Task",
       entityId: taskId,
       metadata: {
-        oldAssigneeId: existingTask.assigneeId ?? null,
-        newAssigneeId: data.assigneeId ?? null,
+        taskTitle: existingTask.title,
+        previousAssigneeName: existingTask.assignee?.name ?? null,
+        newAssigneeName: updatedTask.assignee?.name ?? null,
       },
     });
   }
@@ -266,7 +271,34 @@ async function updateTask(taskId, data, userId) {
       entityType: "Task",
       entityId: taskId,
       metadata: {
-        changes: data,
+        taskTitle: existingTask.title,
+        changes: {
+          ...data,
+          ...(data.status !== undefined
+            ? {
+                status: {
+                  from: existingTask.status,
+                  to: data.status,
+                },
+              }
+            : {}),
+          ...(data.priority !== undefined
+            ? {
+                priority: {
+                  from: existingTask.priority,
+                  to: data.priority,
+                },
+              }
+            : {}),
+          ...(data.dueDate !== undefined
+            ? {
+                dueDate: {
+                  from: existingTask.dueDate,
+                  to: data.dueDate,
+                },
+              }
+            : {}),
+        },
       },
     });
   }
@@ -279,11 +311,12 @@ async function updateTask(taskId, data, userId) {
       eventType: "TASK_COMPLETED",
       entityType: "Task",
       entityId: taskId,
-      metadata: {
-        oldStatus: existingTask.status,
-        newStatus: data.status,
-      },
-    });
+    metadata: {
+      oldStatus: existingTask.status,
+      newStatus: data.status,
+      taskTitle: existingTask.title,
+    },
+  });
   }
 
   for (const event of eventsToPublish) {
@@ -345,8 +378,7 @@ async function deleteTask(taskId) {
     entityId: taskId,
     metadata: {
       taskTitle: existingTask.title,
-      projectId: existingTask.projectId,
-      assigneeId: existingTask.assigneeId ?? null,
+      projectName: existingTask.project?.name ?? null,
     },
   });
 

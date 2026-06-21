@@ -17,47 +17,59 @@ type ProjectCardProps = {
 };
 
 function ProjectCard({ project, onSelect, onEdit, onDelete }: ProjectCardProps) {
+  const organizationLabel = project.organization?.name ?? project.orgId ?? null;
+  const createdLabel = `Created ${formatProjectDate(project.createdAt)}`;
+  const metadataLabel = organizationLabel ? `${organizationLabel} • ${project.isActive ? "Active" : "Selectable"}` : project.isActive ? "Active" : "Selectable";
+
   return (
-    <motion.div whileHover={{ y: -5 }} transition={{ type: "spring", stiffness: 240, damping: 20 }}>
+    <motion.div whileHover={{ y: -3 }} transition={{ type: "spring", stiffness: 240, damping: 20 }}>
       <Card className={`h-full overflow-hidden border-white/10 bg-white/[0.04] ${project.isActive ? "ring-1 ring-violet-400/30" : ""}`}>
-        <CardHeader className="space-y-4">
+        <CardHeader className="space-y-2 p-4 pb-2">
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <CardTitle className="text-xl text-white">{project.name}</CardTitle>
-              <CardDescription className="mt-2 min-h-12 text-white/60">
-                {project.description || "No description provided yet."}
+            <div className="min-w-0 flex-1">
+              <CardTitle className="truncate text-xl font-bold text-white" title={project.name}>
+                {project.name}
+              </CardTitle>
+              <CardDescription className="mt-1.5 line-clamp-2 min-h-[2.5rem] text-[0.8125rem] leading-relaxed text-white/60">
+                {project.description || "No description provided"}
               </CardDescription>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-white/65">
-              <Sparkles className="size-5 text-violet-200" />
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-2 text-white/65">
+              <Sparkles className="size-4 text-violet-200" />
             </div>
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Badge variant="default" className={getCoordinationTone(project.stats.coordinationHealth)}>
+            <Badge variant="default" className={`px-2.5 py-0.5 text-[11px] font-medium ${getCoordinationTone(project.stats.coordinationHealth)}`}>
               {getCoordinationLabel(project)}
             </Badge>
-            {project.isActive ? <Badge variant="purple">Active project</Badge> : <Badge variant="default">Selectable</Badge>}
+            {project.isActive ? (
+              <Badge variant="purple" className="px-2.5 py-0.5 text-[11px] font-medium">
+                Active project
+              </Badge>
+            ) : null}
+          </div>
+
+          <div className="flex items-center gap-3 text-[0.8125rem] text-white/50">
+            <span className="truncate">{createdLabel}</span>
+            <span className="text-white/25">•</span>
+            <span className="truncate">{metadataLabel}</span>
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-3 gap-3">
-            <StatTile label="Tasks" value={project.stats.taskCount} />
-            <StatTile label="Done" value={project.stats.completedTaskCount} tone="emerald" />
-            <StatTile label="Blocked" value={project.stats.blockedTaskCount} tone="amber" />
+        <CardContent className="space-y-3 p-4 pt-0">
+          <div className="flex flex-nowrap gap-2 overflow-hidden">
+            <StatChip label="Tasks" value={project.stats.taskCount} />
+            <StatChip label="Done" value={project.stats.completedTaskCount} tone="emerald" />
+            <StatChip label="Blocked" value={project.stats.blockedTaskCount} tone="amber" />
           </div>
 
-          <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/70">
+          <div className="grid gap-1.5 rounded-2xl border border-white/10 bg-black/20 p-3 text-sm text-white/70">
             <div className="flex items-center gap-2 text-blue-200">
               <ShieldAlert className="size-4" />
               AI coordination health
             </div>
-            <p>{project.stats.coordinationReason}</p>
-            <div className="flex items-center justify-between text-xs text-white/45">
-              <span>Created {formatProjectDate(project.createdAt)}</span>
-              <span>{project.organization?.name ?? project.orgId ?? "Unknown org"}</span>
-            </div>
+            <p className="line-clamp-2">{project.stats.coordinationReason}</p>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -95,13 +107,13 @@ function ProjectCard({ project, onSelect, onEdit, onDelete }: ProjectCardProps) 
   );
 }
 
-type StatTileProps = {
+type StatChipProps = {
   label: string;
   value: number;
   tone?: "emerald" | "amber" | "violet";
 };
 
-function StatTile({ label, value, tone = "violet" }: StatTileProps) {
+function StatChip({ label, value, tone = "violet" }: StatChipProps) {
   const toneClasses = {
     emerald: "border-emerald-400/20 bg-emerald-500/10 text-emerald-100",
     amber: "border-amber-400/20 bg-amber-500/10 text-amber-100",
@@ -109,9 +121,9 @@ function StatTile({ label, value, tone = "violet" }: StatTileProps) {
   } as const;
 
   return (
-    <div className={`rounded-2xl border px-3 py-3 text-center ${toneClasses[tone]}`}>
-      <p className="text-[11px] uppercase tracking-[0.16em] opacity-70">{label}</p>
-      <p className="mt-1 text-2xl font-semibold">{value}</p>
+    <div className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[0.8125rem] leading-none ${toneClasses[tone]}`}>
+      <span className="font-medium">{value}</span>
+      <span className="text-white/65">{label}</span>
     </div>
   );
 }

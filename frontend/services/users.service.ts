@@ -21,4 +21,9 @@ async function getUsers(): Promise<WorkspaceUser[]> {
   return [];
 }
 
-export { getUsers };
+async function getOrganizationMembers(orgId: string) {
+  const { data } = await api.get(`/organizations/${orgId}/members`);
+  return data;
+}
+
+export { getUsers, getOrganizationMembers };

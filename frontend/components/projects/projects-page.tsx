@@ -11,7 +11,6 @@ import { ProjectFormModal } from "@/components/projects/project-form-modal";
 import { ProjectInsightsCard } from "@/components/projects/project-insights-card";
 import { ProjectMemberModal } from "@/components/projects/project-member-modal";
 import { ProjectRow } from "@/components/projects/project-row";
-import { ProjectSelector } from "@/components/projects/project-selector";
 import { ProjectSkeleton } from "@/components/projects/project-skeleton";
 import { ProjectStats } from "@/components/projects/project-stats";
 import { ProjectToolbar } from "@/components/projects/project-toolbar";
@@ -25,6 +24,7 @@ import { getApiErrorMessage } from "@/lib/api-errors";
 import { getActiveOrgIdFromAccessToken } from "@/lib/token";
 import { queryKeys } from "@/lib/query-client";
 import type { CreateProjectInput, ProjectMember, ProjectStats as ProjectStatsData, ProjectWithStats, UpdateProjectInput } from "@/types/project";
+import { eventQueryKey } from "@/components/events/hooks/use-activity-timeline";
 
 function ProjectsPage() {
   const queryClient = useQueryClient();
@@ -40,7 +40,7 @@ function ProjectsPage() {
   const [memberMode, setMemberMode] = useState<"add" | "edit">("add");
   const [editingMember, setEditingMember] = useState<ProjectMember | null>(null);
   const [removingMember, setRemovingMember] = useState<ProjectMember | null>(null);
-  const [activeDetailsTab, setActiveDetailsTab] = useState<"overview" | "tasks" | "team">("overview");
+  const [activeDetailsTab, setActiveDetailsTab] = useState<"overview" | "tasks" | "team" | "activity">("overview");
   const [workspaceUsers, setWorkspaceUsers] = useState<WorkspaceUser[]>([]);
 
   const filteredProjects = useMemo(() => {
@@ -84,6 +84,7 @@ function ProjectsPage() {
 
   async function handleCreateProject(input: CreateProjectInput | UpdateProjectInput) {
     const project = await createNewProject(input as CreateProjectInput);
+    void queryClient.invalidateQueries({ queryKey: eventQueryKey("organization", project.orgId) });
     toast({
       title: "Project created",
       description: project.name,
@@ -97,6 +98,8 @@ function ProjectsPage() {
     }
 
     await updateExistingProject(editingProject.id, input as UpdateProjectInput);
+    void queryClient.invalidateQueries({ queryKey: eventQueryKey("project", editingProject.id) });
+    void queryClient.invalidateQueries({ queryKey: eventQueryKey("organization", editingProject.orgId) });
     setEditingProject(null);
     toast({
       title: "Project updated",
@@ -131,6 +134,8 @@ function ProjectsPage() {
     if (!selectedProject) return;
     await addProjectMember(selectedProject.id, input);
     await refresh();
+    void queryClient.invalidateQueries({ queryKey: eventQueryKey("project", selectedProject.id) });
+    void queryClient.invalidateQueries({ queryKey: eventQueryKey("organization", selectedProject.orgId) });
     toast({
       title: "Member added",
       description: "Team roster updated.",
@@ -141,6 +146,8 @@ function ProjectsPage() {
   async function handleEditMember(input: { userId: string; role?: "OWNER" | "LEAD" | "MEMBER"; skills?: ("Frontend" | "Backend" | "AI/ML" | "UI/UX" | "Testing" | "DevOps")[] }) {
     if (!selectedProject || !editingMember) return;
     await updateProjectMember(selectedProject.id, editingMember.userId, input);
+    void queryClient.invalidateQueries({ queryKey: eventQueryKey("project", selectedProject.id) });
+    void queryClient.invalidateQueries({ queryKey: eventQueryKey("organization", selectedProject.orgId) });
     setEditingMember(null);
     await refresh();
     toast({
@@ -179,6 +186,10 @@ function ProjectsPage() {
     },
     onSuccess: () => {
       setRemovingMember(null);
+      if (selectedProject) {
+        void queryClient.invalidateQueries({ queryKey: eventQueryKey("project", selectedProject.id) });
+        void queryClient.invalidateQueries({ queryKey: eventQueryKey("organization", selectedProject.orgId) });
+      }
       toast({
         title: "Member removed",
         description: "Project membership deleted.",
@@ -231,20 +242,20 @@ function ProjectsPage() {
 
         <ProjectStats projects={projects} />
 
-        <div className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
-          <div className="space-y-4">
-            <ProjectToolbar
-              search={search}
-              viewMode={viewMode}
-              statusFilter={statusFilter}
-              healthFilter={healthFilter}
-              onSearchChange={setSearch}
-              onViewModeChange={setViewMode}
-              onStatusFilterChange={setStatusFilter}
-              onHealthFilterChange={setHealthFilter}
-              onCreateProject={() => setIsCreateOpen(true)}
-            />
+        <ProjectToolbar
+          search={search}
+          viewMode={viewMode}
+          statusFilter={statusFilter}
+          healthFilter={healthFilter}
+          onSearchChange={setSearch}
+          onViewModeChange={setViewMode}
+          onStatusFilterChange={setStatusFilter}
+          onHealthFilterChange={setHealthFilter}
+          onCreateProject={() => setIsCreateOpen(true)}
+        />
 
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.86fr)_minmax(0,1fr)] xl:items-start">
+          <div className="space-y-4">
             {filteredProjects.length === 0 ? (
               <ProjectEmptyState
                 title={hasActiveFilters ? "No matching projects" : "No projects found"}
@@ -260,7 +271,7 @@ function ProjectsPage() {
                 }
               />
             ) : viewMode === "grid" ? (
-              <div className="grid gap-4 xl:grid-cols-2">
+              <div className="grid gap-3 xl:grid-cols-[repeat(2,minmax(0,1fr))]">
                 {filteredProjects.map((project) => (
                   <ProjectCard
                     key={project.id}
@@ -272,7 +283,7 @@ function ProjectsPage() {
                 ))}
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {filteredProjects.map((project) => (
                   <ProjectRow
                     key={project.id}
@@ -287,7 +298,6 @@ function ProjectsPage() {
           </div>
 
           <div className="space-y-4">
-            <ProjectSelector projects={projects} activeProjectId={activeProjectId} onSelectProject={selectProject} />
             <ProjectInsightsCard
               project={selectedProject}
               activeTab={activeDetailsTab}
@@ -302,9 +312,9 @@ function ProjectsPage() {
                 setEditingMember(member);
                 setIsMemberOpen(true);
               }}
-            onRemoveMember={(member) => setRemovingMember(member)}
-          />
-        </div>
+              onRemoveMember={(member) => setRemovingMember(member)}
+            />
+          </div>
         </div>
 
         <ProjectFormModal

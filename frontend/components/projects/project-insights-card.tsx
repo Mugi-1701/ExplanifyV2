@@ -2,13 +2,14 @@ import { CalendarDays, ListTodo, Plus, Sparkles, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ActivityTimeline } from "@/components/events";
 import type { ProjectMember, ProjectWithStats } from "@/types/project";
 import { formatProjectDate, getCoordinationTone } from "./project-utils";
 
 type ProjectInsightsCardProps = {
   project: ProjectWithStats | null;
-  activeTab: "overview" | "tasks" | "team";
-  onTabChange: (tab: "overview" | "tasks" | "team") => void;
+  activeTab: "overview" | "tasks" | "team" | "activity";
+  onTabChange: (tab: "overview" | "tasks" | "team" | "activity") => void;
   onAddMember: () => void;
   onEditMember: (member: ProjectMember) => void;
   onRemoveMember: (member: ProjectMember) => void;
@@ -43,17 +44,18 @@ function ProjectInsightsCard({ project, activeTab, onTabChange, onAddMember, onE
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 rounded-2xl border border-white/10 bg-black/20 p-2">
+        <div className="flex flex-nowrap gap-2 overflow-x-auto rounded-2xl border border-white/10 bg-black/20 p-2">
           {[
             { key: "overview", label: "Overview" },
             { key: "tasks", label: "Tasks" },
             { key: "team", label: "Team" },
+            { key: "activity", label: "Activity" },
           ].map((tab) => (
             <button
               key={tab.key}
               type="button"
-              onClick={() => onTabChange(tab.key as "overview" | "tasks" | "team")}
-              className={`rounded-xl px-4 py-2 text-sm transition ${
+              onClick={() => onTabChange(tab.key as "overview" | "tasks" | "team" | "activity")}
+              className={`shrink-0 rounded-xl px-4 py-2 text-sm transition ${
                 activeTab === tab.key ? "bg-violet-500/20 text-violet-100" : "text-white/55 hover:bg-white/5 hover:text-white"
               }`}
             >
@@ -137,6 +139,15 @@ function ProjectInsightsCard({ project, activeTab, onTabChange, onAddMember, onE
               {members.length > 0 ? members.map((member) => <MemberCard key={member.id} member={member} tasks={tasks} onEdit={onEditMember} onRemove={onRemoveMember} />) : <p className="text-sm text-white/50">No members have been added yet.</p>}
             </div>
           </div>
+        ) : null}
+
+        {activeTab === "activity" ? (
+          <ActivityTimeline
+            scope="project"
+            id={project.id}
+            title="Project activity"
+            description="A chronological trail of project and task events."
+          />
         ) : null}
       </CardContent>
     </Card>

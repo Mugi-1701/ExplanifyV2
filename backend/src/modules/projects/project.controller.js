@@ -26,6 +26,12 @@ const create = asyncHandler(async (req, res) => {
     teamId: req.body.teamId,
     startDate: req.body.startDate,
     dueDate: req.body.dueDate,
+    category: req.body.category,
+    priority: req.body.priority,
+    goal: req.body.goal,
+    expectedDeliverable: req.body.expectedDeliverable,
+    estimatedDuration: req.body.estimatedDuration,
+    leadId: req.body.leadId,
   });
   res.status(201).json({ data: project });
 });

@@ -89,6 +89,12 @@ export type CreateProjectInput = {
   teamId?: string;
   startDate?: string;
   dueDate?: string;
+  category?: string;
+  priority?: string;
+  goal?: string;
+  expectedDeliverable?: string;
+  estimatedDuration?: string;
+  leadId?: string;
 };
 
 export type UpdateProjectInput = Partial<Omit<CreateProjectInput, "orgId">>;

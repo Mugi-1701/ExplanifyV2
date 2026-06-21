@@ -27,6 +27,7 @@ import { SmartCoordinationToast } from "@/components/coordination/smart-coordina
 import { AIStatusSuggestionPopup } from "@/components/coordination/ai-status-suggestion-popup";
 import { useSmartStatusEngine, type SmartStatusSuggestion } from "@/hooks/useSmartStatusEngine";
 import { sortTasksByPriority } from "./task-utils";
+import { eventQueryKey } from "@/components/events/hooks/use-activity-timeline";
 
 type TasksPageProps = {
   projectId?: string;
@@ -168,6 +169,7 @@ function TasksPage({ projectId }: TasksPageProps) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.tasks(context.projectId), refetchType: "active" });
       // Force a fast refetch to ensure related coordination updates propagate immediately
       void queryClient.invalidateQueries({ queryKey: queryKeys.tasks(context.projectId) });
+      void queryClient.invalidateQueries({ queryKey: eventQueryKey("project", context.projectId) });
       recordInteraction(task.id);
       toast({
         title: "Task created",
@@ -237,6 +239,7 @@ function TasksPage({ projectId }: TasksPageProps) {
       updateProjectStatsCache(queryClient, context.projectId);
       syncProjectTasksCache(queryClient, context.projectId);
       void queryClient.invalidateQueries({ queryKey: queryKeys.tasks(context.projectId), refetchType: "active" });
+      void queryClient.invalidateQueries({ queryKey: eventQueryKey("project", context.projectId) });
 
       if (variables.input.status !== undefined) {
         resetActivityForStatusChange(variables.taskId, task.status);
@@ -305,6 +308,7 @@ function TasksPage({ projectId }: TasksPageProps) {
       updateProjectStatsCache(queryClient, context.projectId);
       syncProjectTasksCache(queryClient, context.projectId);
       void queryClient.invalidateQueries({ queryKey: queryKeys.tasks(context.projectId), refetchType: "active" });
+      void queryClient.invalidateQueries({ queryKey: eventQueryKey("project", context.projectId) });
       toast({
         title: "Task deleted",
         variant: "success",

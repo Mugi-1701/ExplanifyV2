@@ -146,6 +146,12 @@ const createProjectService = async ({
   teamId,
   startDate,
   dueDate,
+  category,
+  priority,
+  goal,
+  expectedDeliverable,
+  estimatedDuration,
+  leadId,
 }) => {
   await assertMembership({ orgId, userId });
 
@@ -174,6 +180,13 @@ const createProjectService = async ({
       name,
       slug: resolvedSlug,
       status: status ?? "ACTIVE",
+      projectName: name,
+      category,
+      priority,
+      goal,
+      expectedDeliverable,
+      estimatedDuration,
+      leadId,
     },
   });
 
@@ -220,6 +233,7 @@ const updateProjectService = async ({ projectId, userId, data }) => {
     entityId: projectId,
     metadata: {
       changes: updateData,
+      projectName: updatedProject.name ?? project.name,
     },
   });
 
@@ -275,6 +289,7 @@ const addProjectMemberService = async ({ projectId, userId, actorId, data }) => 
     entityId: member.id,
     metadata: {
       memberId: data.userId,
+      memberName: member.user?.name ?? null,
       role,
       skills: data.skills ?? [],
     },
@@ -331,6 +346,7 @@ const removeProjectMemberService = async ({ projectId, userId, actorId }) => {
     entityId: userId,
     metadata: {
       memberId: userId,
+      memberName: existingMember.user?.name ?? null,
     },
   });
 

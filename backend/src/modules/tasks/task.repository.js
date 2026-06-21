@@ -47,6 +47,13 @@ async function createTask(data) {
     },
 
     include: {
+      project: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+
       assignee: {
         select: {
           id: true,

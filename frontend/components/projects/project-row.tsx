@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, CheckCircle2, PencilLine, Trash2 } from "lucide-react";
+import { CheckCircle2, PencilLine, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,37 +16,32 @@ type ProjectRowProps = {
 };
 
 function ProjectRow({ project, onSelect, onEdit, onDelete }: ProjectRowProps) {
+  const organizationLabel = project.organization?.name ?? project.orgId ?? null;
+  const metadataLabel = organizationLabel ? `${organizationLabel} • ${project.isActive ? "Active" : "Selectable"}` : project.isActive ? "Active" : "Selectable";
+
   return (
     <Card className={`border-white/10 bg-white/[0.03] ${project.isActive ? "ring-1 ring-violet-400/30" : ""}`}>
-      <div className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-3 p-3.5 md:flex-row md:items-center md:justify-between">
         <button type="button" onClick={() => onSelect(project.id)} className="flex-1 text-left">
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-lg font-semibold text-white">{project.name}</p>
-              <p className="mt-1 text-sm text-white/55">{project.description || "No description provided."}</p>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-lg font-bold text-white" title={project.name}>
+                {project.name}
+              </p>
+              <p className="mt-1 line-clamp-2 text-[0.8125rem] leading-relaxed text-white/55">{project.description || "No description provided"}</p>
             </div>
-            <Badge variant="default" className={getCoordinationTone(project.stats.coordinationHealth)}>
+            <Badge variant="default" className={`shrink-0 px-2.5 py-0.5 text-[11px] font-medium ${getCoordinationTone(project.stats.coordinationHealth)}`}>
               {getCoordinationLabel(project)}
             </Badge>
           </div>
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-white/45">
-            <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/20 px-3 py-1">
-              <CalendarDays className="size-3.5" />
-              Created {formatProjectDate(project.createdAt)}
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/20 px-3 py-1">
-              {project.organization?.name ?? project.orgId ?? "Unknown org"}
-            </span>
-            {project.isActive ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-violet-400/20 bg-violet-500/10 px-3 py-1 text-violet-100">
-                <CheckCircle2 className="size-3.5" />
-                Active
-              </span>
-            ) : null}
+          <div className="mt-2 flex items-center gap-3 text-[0.8125rem] text-white/50">
+            <span className="truncate">Created {formatProjectDate(project.createdAt)}</span>
+            <span className="text-white/25">•</span>
+            <span className="truncate">{metadataLabel}</span>
           </div>
         </button>
 
-        <div className="grid grid-cols-3 gap-2 md:w-[380px]">
+        <div className="flex flex-nowrap gap-2 md:max-w-[280px] md:justify-end">
           <MiniStat label="Tasks" value={project.stats.taskCount} />
           <MiniStat label="Done" value={project.stats.completedTaskCount} tone="emerald" />
           <MiniStat label="Blocked" value={project.stats.blockedTaskCount} tone="amber" />
@@ -84,9 +79,9 @@ function MiniStat({ label, value, tone = "violet" }: MiniStatProps) {
   } as const;
 
   return (
-    <div className={`rounded-2xl border px-3 py-3 text-center ${toneClasses[tone]}`}>
-      <p className="text-[11px] uppercase tracking-[0.16em] opacity-70">{label}</p>
-      <p className="mt-1 text-2xl font-semibold">{value}</p>
+    <div className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[0.8125rem] leading-none ${toneClasses[tone]}`}>
+      <span className="font-medium">{value}</span>
+      <span className="text-white/65">{label}</span>
     </div>
   );
 }
