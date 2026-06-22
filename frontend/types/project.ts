@@ -4,10 +4,6 @@ export type ProjectOwner = {
   email: string;
 };
 
-export type ProjectSkill = "Frontend" | "Backend" | "AI/ML" | "UI/UX" | "Testing" | "DevOps";
-
-export type ProjectMemberRole = "OWNER" | "LEAD" | "MEMBER";
-
 export type ProjectMemberUser = {
   id: string;
   name: string;
@@ -19,10 +15,20 @@ export type ProjectMember = {
   id: string;
   projectId: string;
   userId: string;
-  role: ProjectMemberRole;
+  roleId?: string | null;
+  role?: string;
   createdAt?: string;
   user?: ProjectMemberUser;
-  skills?: ProjectSkill[];
+  skillIds?: string[];
+  skills?: string[];
+  memberSkills?: Array<{
+    skillId?: string;
+    skill?: {
+      id?: string;
+      name?: string | null;
+    } | null;
+    name?: string | null;
+  }>;
   assignedTaskCount?: number;
   completedTaskCount?: number;
   activeTaskCount?: number;
@@ -101,6 +107,7 @@ export type UpdateProjectInput = Partial<Omit<CreateProjectInput, "orgId">>;
 
 export type AddProjectMemberInput = {
   userId: string;
-  role?: ProjectMemberRole;
-  skills?: ProjectSkill[];
+  roleId?: string | null;
+  role?: string;
+  skillIds?: string[];
 };

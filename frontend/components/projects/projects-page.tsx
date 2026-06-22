@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 
@@ -42,6 +42,8 @@ function ProjectsPage() {
   const [removingMember, setRemovingMember] = useState<ProjectMember | null>(null);
   const [activeDetailsTab, setActiveDetailsTab] = useState<"overview" | "tasks" | "team" | "activity">("overview");
   const [workspaceUsers, setWorkspaceUsers] = useState<WorkspaceUser[]>([]);
+  const detailsRef = useRef<HTMLDivElement | null>(null);
+  const [detailsHighlight, setDetailsHighlight] = useState(false);
 
   const filteredProjects = useMemo(() => {
     const normalized = search.trim().toLowerCase();
@@ -130,7 +132,44 @@ function ProjectsPage() {
     }
   }
 
-  async function handleAddMember(input: { userId: string; role?: "OWNER" | "LEAD" | "MEMBER"; skills?: ("Frontend" | "Backend" | "AI/ML" | "UI/UX" | "Testing" | "DevOps")[] }) {
+  async function handleArchiveProject() {
+    if (!selectedProject) return;
+    try {
+      await updateExistingProject(selectedProject.id, { status: "ARCHIVED" });
+      void queryClient.invalidateQueries({ queryKey: eventQueryKey("project", selectedProject.id) });
+      void queryClient.invalidateQueries({ queryKey: eventQueryKey("organization", selectedProject.orgId) });
+      toast({ title: "Project archived", description: selectedProject.name, variant: "success" });
+      await refresh();
+    } catch (err) {
+      toast({ title: "Archive failed", description: getApiErrorMessage(err, "Unable to archive project."), variant: "error" });
+    }
+  }
+
+  async function handleChangeLead(userId: string) {
+    if (!selectedProject || !userId) return;
+    try {
+      const prevLead = (selectedProject.members ?? []).find((m) => m.role === "Tech Lead");
+      if (prevLead && prevLead.userId !== userId) {
+        await updateProjectMember(selectedProject.id, prevLead.userId, { role: "Member" });
+      }
+
+      const existing = (selectedProject.members ?? []).find((m) => m.userId === userId);
+      if (existing) {
+        await updateProjectMember(selectedProject.id, userId, { role: "Tech Lead" });
+      } else {
+        await addProjectMember(selectedProject.id, { userId, role: "Tech Lead", skills: [] });
+      }
+
+      void queryClient.invalidateQueries({ queryKey: eventQueryKey("project", selectedProject.id) });
+      void queryClient.invalidateQueries({ queryKey: eventQueryKey("organization", selectedProject.orgId) });
+      toast({ title: "Project lead updated", description: "Project lead changed.", variant: "success" });
+      await refresh();
+    } catch (err) {
+      toast({ title: "Update failed", description: getApiErrorMessage(err, "Unable to change project lead."), variant: "error" });
+    }
+  }
+
+  async function handleAddMember(input: { userId: string; roleId?: string | null; role?: string; skillIds?: string[] }) {
     if (!selectedProject) return;
     await addProjectMember(selectedProject.id, input);
     await refresh();
@@ -143,7 +182,7 @@ function ProjectsPage() {
     });
   }
 
-  async function handleEditMember(input: { userId: string; role?: "OWNER" | "LEAD" | "MEMBER"; skills?: ("Frontend" | "Backend" | "AI/ML" | "UI/UX" | "Testing" | "DevOps")[] }) {
+  async function handleEditMember(input: { userId: string; roleId?: string | null; role?: string; skillIds?: string[] }) {
     if (!selectedProject || !editingMember) return;
     await updateProjectMember(selectedProject.id, editingMember.userId, input);
     void queryClient.invalidateQueries({ queryKey: eventQueryKey("project", selectedProject.id) });
@@ -206,6 +245,39 @@ function ProjectsPage() {
   useEffect(() => {
     void getUsers().then(setWorkspaceUsers).catch(() => setWorkspaceUsers([]));
   }, []);
+
+  useEffect(() => {
+    function onViewProject(e: Event) {
+      const ce = e as CustomEvent<{ projectId: string; activeTab?: string }>;
+      const projectId = ce?.detail?.projectId;
+      if (!projectId) return;
+      // ensure project selected
+      try {
+        selectProject(projectId);
+      } catch (err) {
+        // noop
+      }
+
+      // switch to requested tab (fall back to overview)
+      const requested = ce?.detail?.activeTab as
+        | "overview"
+        | "tasks"
+        | "team"
+        | "activity"
+        | undefined;
+      setActiveDetailsTab(requested ?? "overview");
+
+      // scroll details into view and flash
+      setTimeout(() => {
+        detailsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        setDetailsHighlight(true);
+        setTimeout(() => setDetailsHighlight(false), 2000);
+      }, 50);
+    }
+
+    window.addEventListener("view-project", onViewProject as EventListener);
+    return () => window.removeEventListener("view-project", onViewProject as EventListener);
+  }, [selectProject]);
 
   if (loading && projects.length === 0) {
     return (
@@ -297,7 +369,7 @@ function ProjectsPage() {
             )}
           </div>
 
-          <div className="space-y-4">
+          <div ref={detailsRef} className={`space-y-4 ${detailsHighlight ? "ring-2 ring-violet-400/30 rounded-xl" : ""}`}>
             <ProjectInsightsCard
               project={selectedProject}
               activeTab={activeDetailsTab}
@@ -313,6 +385,10 @@ function ProjectsPage() {
                 setIsMemberOpen(true);
               }}
               onRemoveMember={(member) => setRemovingMember(member)}
+              onEditProject={() => selectedProject && setEditingProject(selectedProject)}
+              onArchiveProject={handleArchiveProject}
+              onDeleteProject={() => selectedProject && void handleDeleteProject(selectedProject)}
+              onChangeLead={handleChangeLead}
             />
           </div>
         </div>

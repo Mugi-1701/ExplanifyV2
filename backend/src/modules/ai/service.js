@@ -3,9 +3,11 @@ const { getMembership } = require("../organizations/organization.repository");
 const { getProjectRecommendationContext } = require("./repository");
 
 const ROLE_BONUS = {
-  OWNER: 5,
-  LEAD: 10,
-  MEMBER: 0,
+  "Tech Lead": 10,
+  Owner: 15,
+  Admin: 8,
+  Member: 0,
+  Viewer: -5,
 };
 
 const WORKLOAD_BONUS = {
@@ -23,19 +25,24 @@ function getWorkloadScore(assignedTaskCount) {
 }
 
 function calculateMemberRecommendation(member, tasks, requiredSkills = []) {
-  const memberSkills = Array.isArray(member.skills) ? member.skills : [];
+  const memberSkills = Array.isArray(member.memberSkills) && member.memberSkills.length > 0
+    ? member.memberSkills.map((entry) => entry.skill?.name).filter(Boolean)
+    : Array.isArray(member.skills)
+      ? member.skills
+      : [];
   const assignedTasks = tasks.filter((task) => task.assigneeId === member.userId);
 
   const matchingSkills = requiredSkills.filter((skill) => memberSkills.includes(skill));
   const skillMatchScore = matchingSkills.length * 50;
   const workloadScore = getWorkloadScore(assignedTasks.length);
-  const roleBonus = ROLE_BONUS[member.role] ?? 0;
+  const role = member.role ?? "Member";
+  const roleBonus = ROLE_BONUS[role] ?? 0;
   const score = skillMatchScore + workloadScore + roleBonus;
 
   const explanation = [
     `Matched ${matchingSkills.length} required skill${matchingSkills.length === 1 ? "" : "s"}: ${matchingSkills.length > 0 ? matchingSkills.join(", ") : "none"}.`,
     `Assigned workload is ${assignedTasks.length}, giving a workload score of ${workloadScore}.`,
-    `Role bonus for ${member.role} is ${roleBonus}.`,
+    `Role bonus for ${role} is ${roleBonus}.`,
   ];
 
   return {

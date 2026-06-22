@@ -5,6 +5,12 @@ const projectInclude = {
   organization: { select: { id: true, name: true, slug: true } },
   members: {
     include: {
+      roleRef: true,
+      memberSkills: {
+        include: {
+          skill: true,
+        },
+      },
       user: {
         select: {
           id: true,
@@ -18,6 +24,8 @@ const projectInclude = {
   tasks: {
     select: {
       id: true,
+      title: true,
+      description: true,
       status: true,
       assigneeId: true,
       dependencies: {
@@ -37,12 +45,13 @@ const projectInclude = {
 /**
  * Create a new project record.
  */
-const createProject = async ({ orgId, ownerId, teamId, name, slug, description, status, startDate, dueDate }) =>
+const createProject = async ({ orgId, ownerId, teamId, teamCode, name, slug, description, status, startDate, dueDate }) =>
   prisma.project.create({
     data: {
       orgId,
       ownerId,
       teamId: teamId ?? null,
+      teamCode: teamCode ?? null,
       name,
       slug: slug ?? null,
       description: description ?? null,
@@ -102,6 +111,12 @@ const listProjectMembers = async (projectId) =>
   prisma.projectMember.findMany({
     where: { projectId },
     include: {
+      roleRef: true,
+      memberSkills: {
+        include: {
+          skill: true,
+        },
+      },
       user: {
         select: {
           id: true,
@@ -131,15 +146,30 @@ const getProjectMember = async (projectId, userId) =>
     },
   });
 
-const addProjectMember = async ({ projectId, userId, role, skills = [] }) =>
+const addProjectMember = async ({ projectId, userId, roleId = null, role = "Member", skills = [], skillIds = [] }) =>
   prisma.projectMember.create({
     data: {
       projectId,
       userId,
+      roleId,
       role,
       skills,
+      memberSkills: skillIds.length
+        ? {
+            createMany: {
+              data: skillIds.map((skillId) => ({ skillId })),
+              skipDuplicates: true,
+            },
+          }
+        : undefined,
     },
     include: {
+      roleRef: true,
+      memberSkills: {
+        include: {
+          skill: true,
+        },
+      },
       user: {
         select: {
           id: true,
@@ -152,21 +182,63 @@ const addProjectMember = async ({ projectId, userId, role, skills = [] }) =>
   });
 
 const updateProjectMember = async (projectId, userId, data) =>
-  prisma.projectMember.update({
-    where: {
-      projectId_userId: { projectId, userId },
-    },
-    data,
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          avatarUrl: true,
+  prisma.$transaction(async (tx) => {
+    const member = await tx.projectMember.update({
+      where: {
+        projectId_userId: { projectId, userId },
+      },
+      data: {
+        roleId: data.roleId,
+        role: data.role,
+        skills: data.skills,
+      },
+      include: {
+        roleRef: true,
+        memberSkills: {
+          include: {
+            skill: true,
+          },
+        },
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatarUrl: true,
+          },
         },
       },
-    },
+    });
+
+    if (Array.isArray(data.skillIds)) {
+      await tx.memberSkill.deleteMany({ where: { memberId: member.id } });
+      if (data.skillIds.length > 0) {
+        await tx.memberSkill.createMany({
+          data: data.skillIds.map((skillId) => ({ memberId: member.id, skillId })),
+          skipDuplicates: true,
+        });
+      }
+    }
+
+    return tx.projectMember.findUnique({
+      where: { projectId_userId: { projectId, userId } },
+      include: {
+        roleRef: true,
+        memberSkills: {
+          include: {
+            skill: true,
+          },
+        },
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
   });
 
 const removeProjectMember = async (projectId, userId) =>

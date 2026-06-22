@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type React from "react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { getApiErrorMessage } from "@/lib/api-errors";
-import { useAuthStore } from "@/store/auth.store";
-import { getTeams, type Team } from "@/services/team.service";
+// team service types not required here
 import { getOrganizationMembers } from "@/services/users.service";
 import type { CreateProjectInput, Project, UpdateProjectInput } from "@/types/project";
 
@@ -19,7 +19,6 @@ type ProjectFormValues = {
   teamId: string;
   startDate: string;
   dueDate: string;
-  category: string;
   priority: string;
   status: string;
 };
@@ -59,62 +58,56 @@ function SectionHeader({ title }: { title: string }) {
 }
 
 function ProjectFormModal({ open, mode, defaultOrgId, project, onClose, onSubmit }: ProjectFormModalProps) {
-  const { session } = useAuthStore();
-
-  const initialValues = useMemo<ProjectFormValues>(
-    () => ({
+  function computeInitialValues(): ProjectFormValues {
+    return {
       name: project?.name ?? "",
       description: project?.description ?? "",
       orgId: project?.orgId ?? defaultOrgId ?? "",
       teamId: project?.teamId ?? "",
       startDate: toDateInputValue(project?.startDate),
       dueDate: toDateInputValue(project?.dueDate),
-      category: "Product Development",
       priority: "",
       status: "PLANNING",
-    }),
-    [defaultOrgId, project]
-  );
+    };
+  }
 
-  const [values, setValues] = useState<ProjectFormValues>(initialValues);
+
+
+  const [values, setValues] = useState<ProjectFormValues>(() => computeInitialValues());
   const [leadId, setLeadId] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [generatedTeamId, setGeneratedTeamId] = useState<string>("");
-
-  const [teams, setTeams] = useState<Team[]>([]);
   const [members, setMembers] = useState<OrgMember[]>([]);
+  const [coordinationId, setCoordinationId] = useState<string>("");
 
   useEffect(() => {
     let cancelled = false;
 
     queueMicrotask(() => {
       if (open && !cancelled) {
-        setValues(initialValues);
+        setValues(computeInitialValues());
         setLeadId("");
         setError(null);
-        setGeneratedTeamId(String(Math.floor(1000 + Math.random() * 9000)));
       }
     });
 
-    if (open && defaultOrgId) {
-      getTeams(defaultOrgId)
-        .then((data) => {
-          if (!cancelled) setTeams(data);
-        })
-        .catch(() => {});
-
+    if (open) {
+      // prefetch org members to populate Project Lead dropdown
       getOrganizationMembers(defaultOrgId)
         .then((data: any) => {
           if (!cancelled) setMembers(Array.isArray(data) ? data : data.data || []);
         })
         .catch(() => {});
+
+      // generate a coordination id for this modal session
+      const id = String(Math.floor(1000 + Math.random() * 9000));
+      setCoordinationId(id);
     }
 
     return () => {
       cancelled = true;
     };
-  }, [initialValues, open, defaultOrgId]);
+  }, [open, project, defaultOrgId]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -122,7 +115,7 @@ function ProjectFormModal({ open, mode, defaultOrgId, project, onClose, onSubmit
     setSubmitting(true);
     setError(null);
     try {
-      if (mode === "create") {
+        if (mode === "create") {
         await onSubmit({
           orgId: values.orgId.trim(),
           name: values.name.trim(),
@@ -130,7 +123,6 @@ function ProjectFormModal({ open, mode, defaultOrgId, project, onClose, onSubmit
           teamId: values.teamId.trim() || undefined,
           startDate: values.startDate || undefined,
           dueDate: values.dueDate || undefined,
-          category: values.category || undefined,
           priority: values.priority || undefined,
           status: values.status || undefined,
           leadId: leadId || undefined,
@@ -162,17 +154,21 @@ function ProjectFormModal({ open, mode, defaultOrgId, project, onClose, onSubmit
       title={mode === "create" ? "Create project" : "Edit project"}
       description="Define the core coordination settings for your workspace."
       size="lg"
+      className="max-w-[850px] w-full"
     >
-      <form className="grid gap-4 md:grid-cols-2" onSubmit={handleSubmit}>
-        <SectionHeader title="Project Basics" />
-        
+      <form className="grid gap-4 grid-cols-1 md:grid-cols-2" onSubmit={handleSubmit}>
+        <SectionHeader title="Project Name" />
+
         <Input
+          autoFocus
           required
           value={values.name}
           onChange={(event) => setValues((current) => ({ ...current, name: event.target.value }))}
           placeholder="Project name"
           className="h-12 rounded-2xl border-white/10 bg-white/5 text-white placeholder:text-white/30 md:col-span-2"
         />
+
+        <SectionHeader title="Description" />
 
         <textarea
           required
@@ -182,80 +178,42 @@ function ProjectFormModal({ open, mode, defaultOrgId, project, onClose, onSubmit
           className="min-h-24 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white placeholder:text-white/30 outline-none transition focus:border-violet-400/40 focus:ring-2 focus:ring-violet-500/15 md:col-span-2"
         />
 
-        <SectionHeader title="Coordination" />
-
-        <label className="space-y-2 text-sm text-white/65">
-          <span className="text-xs uppercase tracking-[0.18em] text-white/45">Category</span>
-          <select
-            required
-            value={values.category}
-            onChange={(event) => setValues((current) => ({ ...current, category: event.target.value }))}
-            className="h-12 w-full appearance-none rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none focus:border-violet-400/40 focus:ring-2 focus:ring-violet-500/15"
-          >
-            <option value="Product Development">Product Development</option>
-            <option value="AI Research">AI Research</option>
-            <option value="Internal Tool">Internal Tool</option>
-            <option value="Client Project">Client Project</option>
-          </select>
-        </label>
+        <SectionHeader title="Priority & Lead" />
 
         <label className="space-y-2 text-sm text-white/65">
           <span className="text-xs uppercase tracking-[0.18em] text-white/45">Priority</span>
-          <select
-            required
+          <Select
+            dropdownId="priority-selector"
             value={values.priority}
-            onChange={(event) => setValues((current) => ({ ...current, priority: event.target.value }))}
-            className="h-12 w-full appearance-none rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none focus:border-violet-400/40 focus:ring-2 focus:ring-violet-500/15"
-          >
-            <option value="" disabled>Select priority</option>
-            <option value="LOW">Low</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="HIGH">High</option>
-            <option value="CRITICAL">Critical</option>
-          </select>
-        </label>
-
-        <label className="space-y-2 text-sm text-white/65 md:col-span-2">
-          <span className="text-xs uppercase tracking-[0.18em] text-white/45">Status</span>
-          <div className="flex h-12 w-full items-center rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-white/50">
-            {values.status.charAt(0) + values.status.slice(1).toLowerCase()}
-          </div>
-        </label>
-
-        <SectionHeader title="Team" />
-
-        <label className="space-y-2 text-sm text-white/65">
-          <span className="text-xs uppercase tracking-[0.18em] text-white/45">Team Selection</span>
-          <select
-            required
-            value={values.teamId}
-            onChange={(event) => setValues((current) => ({ ...current, teamId: event.target.value }))}
-            className="h-12 w-full appearance-none rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none focus:border-violet-400/40 focus:ring-2 focus:ring-violet-500/15"
-          >
-            <option value="" disabled>Select a team</option>
-            {teams.map((t) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
+            onChange={(v) => setValues((current) => ({ ...current, priority: v }))}
+            options={[
+              { value: "", label: "Select priority" },
+              { value: "LOW", label: "Low" },
+              { value: "MEDIUM", label: "Medium" },
+              { value: "HIGH", label: "High" },
+              { value: "CRITICAL", label: "Critical" },
+            ]}
+          />
         </label>
 
         <label className="space-y-2 text-sm text-white/65">
-          <span className="text-xs uppercase tracking-[0.18em] text-white/45">Project Lead</span>
-          <select
+          <span className="text-xs uppercase tracking-[0.18em] text-white/45">Project Lead (optional)</span>
+          <Select
+            dropdownId="project-lead-selector"
             value={leadId}
-            onChange={(event) => setLeadId(event.target.value)}
-            className="h-12 w-full appearance-none rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none focus:border-violet-400/40 focus:ring-2 focus:ring-violet-500/15"
-          >
-            <option value="">Unassigned</option>
-            {members.map((m) => (
-              <option key={m.user.id} value={m.user.id}>{m.user.name}</option>
-            ))}
-          </select>
+            onChange={(v) => setLeadId(v)}
+            options={[{ value: "", label: "Unassigned" }, ...members.map((m) => ({ value: m.user.id, label: m.user.name }))]}
+          />
         </label>
 
-        <div className="md:col-span-2 flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 px-4 py-3 text-sm">
-          <span className="text-white/50">Generated Team ID</span>
-          <span className="font-mono text-emerald-300">{generatedTeamId}</span>
+        <div className="md:col-span-2">
+          <SectionHeader title="Coordination ID" />
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-3 inline-flex items-center gap-3">
+            <div className="flex flex-col">
+              <span className="text-xs uppercase tracking-[0.12em] text-white/45">Coordination ID</span>
+              <span className="font-mono text-2xl text-emerald-300">#{coordinationId}</span>
+            </div>
+          </div>
         </div>
 
         <SectionHeader title="Timeline" />
@@ -292,7 +250,14 @@ function ProjectFormModal({ open, mode, defaultOrgId, project, onClose, onSubmit
           </Button>
           <Button
             type="submit"
-            disabled={submitting || !values.name.trim() || !values.priority || !values.teamId}
+            disabled={
+              submitting ||
+              !values.name.trim() ||
+              !values.description.trim() ||
+              !values.priority ||
+              !values.startDate ||
+              !values.dueDate
+            }
             className="rounded-2xl bg-gradient-to-r from-violet-500 to-blue-500 text-white hover:opacity-95 disabled:opacity-50"
           >
             {submitting ? "Saving..." : mode === "create" ? "Create project" : "Save changes"}

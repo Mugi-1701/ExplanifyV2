@@ -1,8 +1,9 @@
 "use client";
 
-import { ChevronDown, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select } from "@/components/ui/select";
 import type { ProjectWithStats } from "@/types/project";
 
 type ProjectSelectorProps = {
@@ -32,18 +33,12 @@ function ProjectSelector({ projects, activeProjectId, onSelectProject }: Project
         <label className="block text-xs uppercase tracking-[0.18em] text-white/45">
           Current project
           <div className="relative mt-2">
-            <select
+            <Select
+              dropdownId="project-selector"
               value={activeProject?.id ?? ""}
-              onChange={(event) => onSelectProject(event.target.value)}
-              className="h-12 w-full appearance-none rounded-2xl border border-white/10 bg-black/20 px-4 pr-10 text-sm text-white outline-none transition focus:border-violet-400/40 focus:ring-2 focus:ring-violet-500/15"
-            >
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-white/35" />
+              onChange={(v) => onSelectProject(v)}
+              options={projects.map((p) => ({ value: p.id, label: p.name }))}
+            />
           </div>
         </label>
 

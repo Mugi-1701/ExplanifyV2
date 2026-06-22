@@ -25,3 +25,14 @@ export async function getTeams(orgId?: string): Promise<Team[]> {
   
   return [];
 }
+
+export async function getTeamMembers(teamId: string) {
+  try {
+    const { data } = await api.get(`/teams/${teamId}/members`);
+    if (Array.isArray(data)) return data;
+    if (data && typeof data === "object" && "data" in data) return (data as { data: any[] }).data || [];
+    return [];
+  } catch (e) {
+    return [];
+  }
+}

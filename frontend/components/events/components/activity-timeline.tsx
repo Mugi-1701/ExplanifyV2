@@ -10,7 +10,7 @@ import { EventItem } from "./event-item";
 import { TimelineSkeleton } from "./timeline-skeleton";
 import { useActivityTimeline } from "../hooks/use-activity-timeline";
 import { buildDisplayEvent } from "../utils/event-display";
-import type { TimelineScope } from "../types";
+import type { EventLog, TimelineScope } from "../types";
 
 type ActivityTimelineProps = {
   scope: TimelineScope;
@@ -181,12 +181,12 @@ function TimelineState({ tone, action, error = false }: { tone: string; action?:
   );
 }
 
-function groupEventsByDate(events: Array<{ createdAt: string; id: string } & Record<string, unknown>>) {
+function groupEventsByDate(events: EventLog[]) {
   const today = startOfDay(new Date());
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
 
-  const groups: Record<"Today" | "Yesterday" | "Older", typeof events> = {
+  const groups: Record<"Today" | "Yesterday" | "Older", EventLog[]> = {
     Today: [],
     Yesterday: [],
     Older: [],

@@ -146,6 +146,8 @@ model Organization {
   memberships   Membership[]
   teams         Team[]
   projects      Project[]
+  roles         WorkspaceRole[]
+  skills        WorkspaceSkill[]
   tasks         Task[]
   activities    ProjectActivity[]
   events        EventLog[]
@@ -234,6 +236,7 @@ model Project {
   organization Organization      @relation(fields: [orgId], references: [id])
   owner        User              @relation(fields: [ownerId], references: [id])
   team         Team?             @relation(fields: [teamId], references: [id])
+  teamCode     String?           @unique
   members      ProjectMember[]
   tasks        Task[]
   activities   ProjectActivity[]
@@ -249,15 +252,61 @@ model ProjectMember {
   id        String      @id @default(uuid())
   projectId String
   userId    String
-  role      ProjectRole @default(MEMBER)
+  roleId    String?
+  role      String      @default("Member")
   skills    String[]    @default([])
   createdAt DateTime    @default(now())
 
   project Project @relation(fields: [projectId], references: [id])
   user    User    @relation(fields: [userId], references: [id])
+  roleRef WorkspaceRole? @relation(fields: [roleId], references: [id])
+  memberSkills MemberSkill[]
 
   @@unique([projectId, userId])
   @@index([projectId, role])
+  @@index([roleId])
+}
+
+model WorkspaceRole {
+  id          String   @id @default(uuid())
+  workspaceId String
+  name        String
+  permissions Json     @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace   Organization   @relation(fields: [workspaceId], references: [id])
+  projectMembers ProjectMember[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+}
+
+model WorkspaceSkill {
+  id          String   @id @default(uuid())
+  workspaceId String
+  name        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace   Organization   @relation(fields: [workspaceId], references: [id])
+  memberSkills MemberSkill[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+}
+
+model MemberSkill {
+  id       String   @id @default(uuid())
+  memberId String
+  skillId  String
+  createdAt DateTime @default(now())
+
+  member ProjectMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  skill  WorkspaceSkill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, skillId])
+  @@index([skillId])
 }
 
 model Task {

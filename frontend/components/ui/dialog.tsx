@@ -67,11 +67,11 @@ function Dialog({ open, onOpenChange, title, description, children, footer, size
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
           onClick={() => onOpenChange(false)}
           role="presentation"
         >
-          <motion.div
+            <motion.div
             initial={{ opacity: 0, y: 18, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 18, scale: 0.98 }}
@@ -82,7 +82,7 @@ function Dialog({ open, onOpenChange, title, description, children, footer, size
             aria-modal="true"
             aria-label={title}
           >
-            <Card className="flex max-h-[90vh] flex-col overflow-hidden border-white/10 bg-[#09111f]/95 shadow-[0_35px_110px_-30px_rgba(0,0,0,0.88)] backdrop-blur-2xl">
+            <Card className="flex max-h-[85vh] flex-col border-white/10 bg-[#09111f]/95 shadow-[0_35px_110px_-30px_rgba(0,0,0,0.88)] backdrop-blur-2xl">
               <CardHeader className="flex-row items-start justify-between gap-4 pb-4">
                 <div className="space-y-1">
                   <CardTitle className="text-2xl text-white">{title}</CardTitle>

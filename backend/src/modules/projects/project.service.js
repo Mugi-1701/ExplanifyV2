@@ -15,6 +15,9 @@ const {
   removeProjectMember,
   getProjectTaskCountsByAssignee,
 } = require("./project.repository");
+const { prisma } = require("../../lib/prisma");
+const { getRoleById } = require("../catalog/roles.repository");
+const { getSkillById } = require("../catalog/skills.repository");
 
 const EMPTY_STATS = {
   taskCount: 0,
@@ -127,13 +130,21 @@ const attachStats = (project) => {
 
   const { tasks = [], ...projectData } = project;
   const stats = buildProjectStats(tasks);
-  return {
+  // expose teamCode as teamId for frontend compatibility (frontend expects a short code on project.teamId)
+  const dto = {
     ...projectData,
     progressPercentage: stats.progressPercentage,
     stats,
     members: project.members ?? [],
     tasks,
   };
+
+  if (project.teamCode) {
+    // set project.teamId to the teamCode so frontend can display it as requested
+    dto.teamId = project.teamCode;
+  }
+
+  return dto;
 };
 
 const createProjectService = async ({
@@ -157,10 +168,29 @@ const createProjectService = async ({
 
   const resolvedSlug = slug ?? `${slugify(name)}-${Date.now().toString(36)}`;
 
+  // Generate a unique 4-digit team code if not provided and persist on project
+  let teamCode = null;
+  if (!teamId) {
+    // try to generate a unique 4-digit code
+    const gen = () => String(Math.floor(1000 + Math.random() * 9000));
+    for (let i = 0; i < 10; i++) {
+      const candidate = gen();
+      // check uniqueness across existing projects
+      // using prisma directly here for a quick uniqueness check
+      // eslint-disable-next-line no-await-in-loop
+      const existing = await prisma.project.findFirst({ where: { teamCode: candidate } });
+      if (!existing) {
+        teamCode = candidate;
+        break;
+      }
+    }
+  }
+
   const project = await createProject({
     orgId,
     ownerId: userId,
-    teamId,
+    teamId: teamId ?? null,
+    teamCode: teamCode ?? null,
     name,
     slug: resolvedSlug,
     description,
@@ -255,9 +285,56 @@ const listProjectMembersService = async ({ projectId, userId }) => {
 
   return members.map((member) => ({
     ...member,
+    roleId: member.roleId ?? null,
+    role: member.roleRef?.name ?? member.role,
+    skillIds:
+      Array.isArray(member.memberSkills) && member.memberSkills.length > 0
+        ? member.memberSkills.map((entry) => entry.skillId)
+        : [],
+    skills:
+      Array.isArray(member.memberSkills) && member.memberSkills.length > 0
+        ? member.memberSkills.map((entry) => entry.skill?.name).filter(Boolean)
+        : member.skills ?? [],
     ...taskCounts.get(member.userId),
   }));
 };
+
+function getMemberRole(member) {
+  return member?.role ?? null;
+}
+
+function canManageProject(member) {
+  return ["Tech Lead", "Owner", "Admin"].includes(getMemberRole(member) ?? "");
+}
+
+async function resolveRoleName({ workspaceId, roleId, role }) {
+  if (roleId) {
+    const roleRecord = await getRoleById(roleId);
+    if (!roleRecord || roleRecord.workspaceId !== workspaceId) {
+      throw new AppError("Role not found", 404);
+    }
+    return { roleId: roleRecord.id, role: roleRecord.name };
+  }
+  return { roleId: null, role: role || "Member" };
+}
+
+async function resolveSkills({ workspaceId, skillIds = [] }) {
+  if (!Array.isArray(skillIds) || skillIds.length === 0) {
+    return { skillIds: [], skills: [] };
+  }
+
+  const uniqueSkillIds = [...new Set(skillIds)];
+  const records = await Promise.all(uniqueSkillIds.map((id) => getSkillById(id)));
+  const invalid = records.find((record) => !record || record.workspaceId !== workspaceId);
+  if (invalid) {
+    throw new AppError("Skill not found", 404);
+  }
+
+  return {
+    skillIds: uniqueSkillIds,
+    skills: records.filter(Boolean).map((record) => record.name),
+  };
+}
 
 const addProjectMemberService = async ({ projectId, userId, actorId, data }) => {
   const project = await findProjectById(projectId);
@@ -265,19 +342,37 @@ const addProjectMemberService = async ({ projectId, userId, actorId, data }) => 
     throw new AppError("Project not found", 404);
   }
 
-  await assertAdminRole({ orgId: project.orgId, userId: actorId });
+  // allow org OWNER/ADMIN or project LEAD to manage members
+  const canManage = async () => {
+    const membership = await getMembership({ orgId: project.orgId, userId: actorId });
+    if (membership && ["OWNER", "ADMIN"].includes(membership.role)) return true;
+    const projMember = await getProjectMember(projectId, actorId);
+    if (projMember && canManageProject(projMember)) return true;
+    return false;
+  };
+
+  if (!(await canManage())) {
+    throw new AppError("Insufficient permissions - OWNER, ADMIN, or PROJECT LEAD required", 403);
+  }
 
   const existingMember = await getProjectMember(projectId, data.userId);
   if (existingMember) {
     throw new AppError("Project member already exists", 409);
   }
 
-  const role = data.role || "MEMBER";
+  const { roleId, role } = await resolveRoleName({
+    workspaceId: project.orgId,
+    roleId: data.roleId,
+    role: data.role,
+  });
+  const { skillIds, skills } = await resolveSkills({ workspaceId: project.orgId, skillIds: data.skillIds ?? [] });
   const member = await addProjectMember({
     projectId,
     userId: data.userId,
+    roleId,
     role,
-    skills: data.skills ?? [],
+    skillIds,
+    skills,
   });
 
   recordEventSafely({
@@ -290,8 +385,10 @@ const addProjectMemberService = async ({ projectId, userId, actorId, data }) => 
     metadata: {
       memberId: data.userId,
       memberName: member.user?.name ?? null,
+      roleId,
       role,
-      skills: data.skills ?? [],
+      skillIds,
+      skills,
     },
   });
 
@@ -304,7 +401,18 @@ const updateProjectMemberService = async ({ projectId, userId, actorId, data }) 
     throw new AppError("Project not found", 404);
   }
 
-  await assertAdminRole({ orgId: project.orgId, userId: actorId });
+  // allow org OWNER/ADMIN or project LEAD to manage members
+  const canManage = async () => {
+    const membership = await getMembership({ orgId: project.orgId, userId: actorId });
+    if (membership && ["OWNER", "ADMIN"].includes(membership.role)) return true;
+    const projMember = await getProjectMember(projectId, actorId);
+    if (projMember && canManageProject(projMember)) return true;
+    return false;
+  };
+
+  if (!(await canManage())) {
+    throw new AppError("Insufficient permissions - OWNER, ADMIN, or PROJECT LEAD required", 403);
+  }
 
   const existingMember = await getProjectMember(projectId, userId);
   if (!existingMember) {
@@ -312,11 +420,19 @@ const updateProjectMemberService = async ({ projectId, userId, actorId, data }) 
   }
 
   const updateData = {};
-  if (data.role !== undefined) {
-    updateData.role = data.role;
+  if (data.roleId !== undefined || data.role !== undefined) {
+    const resolvedRole = await resolveRoleName({
+      workspaceId: project.orgId,
+      roleId: data.roleId ?? null,
+      role: data.role,
+    });
+    updateData.roleId = resolvedRole.roleId;
+    updateData.role = resolvedRole.role;
   }
-  if (data.skills !== undefined) {
-    updateData.skills = data.skills;
+  if (data.skillIds !== undefined) {
+    const resolvedSkills = await resolveSkills({ workspaceId: project.orgId, skillIds: data.skillIds });
+    updateData.skills = resolvedSkills.skills;
+    updateData.skillIds = resolvedSkills.skillIds;
   }
 
   return updateProjectMember(projectId, userId, updateData);
@@ -328,7 +444,18 @@ const removeProjectMemberService = async ({ projectId, userId, actorId }) => {
     throw new AppError("Project not found", 404);
   }
 
-  await assertAdminRole({ orgId: project.orgId, userId: actorId });
+  // allow org OWNER/ADMIN or project LEAD to manage members
+  const canManage = async () => {
+    const membership = await getMembership({ orgId: project.orgId, userId: actorId });
+    if (membership && ["OWNER", "ADMIN"].includes(membership.role)) return true;
+    const projMember = await getProjectMember(projectId, actorId);
+    if (projMember && canManageProject(projMember)) return true;
+    return false;
+  };
+
+  if (!(await canManage())) {
+    throw new AppError("Insufficient permissions - OWNER, ADMIN, or PROJECT LEAD required", 403);
+  }
 
   const existingMember = await getProjectMember(projectId, userId);
   if (!existingMember) {

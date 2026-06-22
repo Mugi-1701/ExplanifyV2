@@ -127,7 +127,7 @@ async function addProjectMember(projectId: string, input: AddProjectMemberInput)
   return data;
 }
 
-async function updateProjectMember(projectId: string, userId: string, input: Partial<Pick<ProjectMember, "role" | "skills">>) {
+async function updateProjectMember(projectId: string, userId: string, input: Partial<Pick<ProjectMember, "roleId" | "role" | "skills">> & { skillIds?: string[] }) {
   const { data } = await api.patch(`/projects/${projectId}/members/${userId}`, input);
   return data;
 }

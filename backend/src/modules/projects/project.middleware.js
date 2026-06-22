@@ -1,6 +1,10 @@
 const { AppError } = require("../../utils/AppError");
-const { findProjectById } = require("./project.repository");
+const { findProjectById, getProjectMember } = require("./project.repository");
 const { requireOrgMembership } = require("../organizations/organization.middleware");
+
+function canManageProject(member) {
+  return ["Tech Lead", "Owner", "Admin"].includes(member?.role ?? "");
+}
 
 const attachOrgIdFromBody = () => (req, res, next) => {
   if (req.body?.orgId) {
@@ -46,4 +50,28 @@ module.exports = {
   attachOrgIdFromQuery,
   requireOrgMembershipIfQuery,
   loadProject,
+  // allow OWNER/ADMIN org roles OR a project LEAD to perform certain actions
+  requireOrgRoleOrProjectLead: (roles) => async (req, res, next) => {
+    // if org role is present and allowed, permit
+    if (req.orgRole && Array.isArray(roles) && roles.includes(req.orgRole)) {
+      return next();
+    }
+
+    // otherwise, check project membership role
+    const actorId = req.auth?.userId;
+    if (!actorId || !req.project) {
+      return next(new AppError("Insufficient permissions", 403));
+    }
+
+    try {
+      const member = await getProjectMember(req.project.id, actorId);
+      if (member && canManageProject(member)) {
+        return next();
+      }
+    } catch (err) {
+      // fall through to error
+    }
+
+    return next(new AppError("Insufficient permissions", 403));
+  },
 };

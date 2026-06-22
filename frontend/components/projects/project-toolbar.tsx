@@ -3,6 +3,7 @@
 import { LayoutGrid, List, Plus, Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import type { ProjectStats } from "@/types/project";
 
@@ -46,30 +47,37 @@ function ProjectToolbar({
             className="h-12 w-full min-w-0 rounded-2xl border-white/10 bg-white/5 pl-11 pr-4 text-white placeholder:text-white/30"
           />
         </div>
-        <select
-          value={statusFilter}
-          onChange={(event) => onStatusFilterChange(event.target.value)}
-          className="h-12 rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none transition focus:border-violet-400/40 focus:ring-2 focus:ring-violet-500/15 xl:w-40"
-        >
-          <option value="ALL">All status</option>
-          {(["PLANNING", "ACTIVE", "AT_RISK", "PAUSED", "COMPLETED", "ARCHIVED"] as const).map((status) => (
-            <option key={status} value={status}>
-              {status.replaceAll("_", " ")}
-            </option>
-          ))}
-        </select>
-        <select
-          value={healthFilter}
-          onChange={(event) => onHealthFilterChange(event.target.value as "ALL" | ProjectStats["coordinationHealth"])}
-          className="h-12 rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none transition focus:border-violet-400/40 focus:ring-2 focus:ring-violet-500/15 xl:w-40"
-        >
-          <option value="ALL">All health</option>
-          {(["HEALTHY", "READY", "WARNING", "BLOCKED", "EMPTY"] as const).map((health) => (
-            <option key={health} value={health}>
-              {health}
-            </option>
-          ))}
-        </select>
+        <div className="xl:w-40">
+          <Select
+            dropdownId="status-selector"
+            value={statusFilter}
+            onChange={(v) => onStatusFilterChange(v)}
+            options={[
+              { value: "ALL", label: "All status" },
+              { value: "PLANNING", label: "PLANNING" },
+              { value: "ACTIVE", label: "ACTIVE" },
+              { value: "AT_RISK", label: "AT RISK" },
+              { value: "PAUSED", label: "PAUSED" },
+              { value: "COMPLETED", label: "COMPLETED" },
+              { value: "ARCHIVED", label: "ARCHIVED" },
+            ]}
+          />
+        </div>
+        <div className="xl:w-40">
+          <Select
+            dropdownId="health-selector"
+            value={healthFilter}
+            onChange={(v) => onHealthFilterChange(v as "ALL" | ProjectStats["coordinationHealth"]) }
+            options={[
+              { value: "ALL", label: "All health" },
+              { value: "HEALTHY", label: "HEALTHY" },
+              { value: "READY", label: "READY" },
+              { value: "WARNING", label: "WARNING" },
+              { value: "BLOCKED", label: "BLOCKED" },
+              { value: "EMPTY", label: "EMPTY" },
+            ]}
+          />
+        </div>
 
         <div className="flex items-center gap-2">
           <div className="inline-flex rounded-2xl border border-white/10 bg-white/5 p-1">
