@@ -14,6 +14,9 @@ type AIRecommendationCardProps = {
 };
 
 function AIRecommendationCard({ recommendation, loading = false, error, applied = false, onUseRecommendation }: AIRecommendationCardProps) {
+  const isFallback = Boolean(recommendation && "recommendedUserId" in recommendation && recommendation.recommendedUserId === null);
+  const matchScore = recommendation ? Math.round(recommendation.score * 100) : null;
+
   return (
     <Card className="border-white/10 bg-white/[0.03]">
       <CardHeader className="space-y-2">
@@ -29,18 +32,18 @@ function AIRecommendationCard({ recommendation, loading = false, error, applied 
           <>
             <div className="flex flex-wrap items-center gap-3">
               <div className="text-sm text-white/70">
-                Recommended: <span className="font-semibold text-white">{recommendation.recommendedName}</span>
+                Recommended: <span className="font-semibold text-white">{isFallback ? "No recommendation available" : recommendation.recommendedMember.name}</span>
               </div>
               <Badge variant={recommendation.confidence === "high" ? "success" : recommendation.confidence === "medium" ? "warning" : "muted"}>
                 Confidence: {recommendation.confidence.charAt(0).toUpperCase() + recommendation.confidence.slice(1)}
               </Badge>
-              <Badge variant="blue">Score: {recommendation.score}</Badge>
+              {matchScore !== null ? <Badge variant="blue">Match Score: {matchScore}%</Badge> : null}
             </div>
 
             <div className="space-y-2">
               <p className="text-xs uppercase tracking-[0.18em] text-white/40">Why?</p>
               <ul className="space-y-1 text-sm text-white/70">
-                {recommendation.explanation.map((item) => (
+                {(recommendation?.reasons ?? []).map((item) => (
                   <li key={item} className="flex gap-2">
                     <span className="text-emerald-300">+</span>
                     <span>{item}</span>
@@ -49,19 +52,23 @@ function AIRecommendationCard({ recommendation, loading = false, error, applied 
               </ul>
             </div>
 
-            <Button
-              type="button"
-              onClick={onUseRecommendation}
-              disabled={applied}
-              variant={applied ? "outline" : "default"}
-              className={
-                applied
-                  ? "cursor-not-allowed rounded-2xl border-emerald-400/25 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/10"
-                  : "rounded-2xl bg-gradient-to-r from-violet-500 to-blue-500 text-white hover:opacity-95"
-              }
-            >
-              {applied ? "✓ Recommendation Applied" : "Apply Recommendation"}
-            </Button>
+            {isFallback ? (
+              <p className="text-sm text-white/55">No recommendation available.</p>
+            ) : (
+              <Button
+                type="button"
+                onClick={onUseRecommendation}
+                disabled={applied}
+                variant={applied ? "outline" : "default"}
+                className={
+                  applied
+                    ? "cursor-not-allowed rounded-2xl border-emerald-400/25 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/10"
+                    : "rounded-2xl bg-gradient-to-r from-violet-500 to-blue-500 text-white hover:opacity-95"
+                }
+              >
+                {applied ? "Recommendation Applied" : "Apply Recommendation"}
+              </Button>
+            )}
 
             {applied ? <p className="text-xs text-emerald-200/80">AI recommendation applied to assignee field.</p> : null}
           </>

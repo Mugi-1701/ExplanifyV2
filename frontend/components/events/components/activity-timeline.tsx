@@ -64,7 +64,7 @@ function ActivityTimeline({ scope, id, title = "Activity timeline", description 
   const groupedEvents = useMemo(() => groupEventsByDate(filteredEvents), [filteredEvents]);
 
   return (
-    <Card className="border-white/10 bg-white/[0.03]">
+    <Card className="hidden-scrollbar border-white/10 bg-white/[0.03]">
       <CardHeader className="space-y-2">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -103,7 +103,7 @@ function ActivityTimeline({ scope, id, title = "Activity timeline", description 
         ) : null}
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="hidden-scrollbar">
         {loading ? <TimelineSkeleton /> : null}
 
         {!loading && error ? (

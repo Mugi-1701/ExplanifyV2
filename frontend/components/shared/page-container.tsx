@@ -14,7 +14,7 @@ const sizeStyles = {
 } as const;
 
 function PageContainer({ children, className, size = "default" }: PageContainerProps) {
-  return <div className={cn("mx-auto w-full px-4 py-6 md:px-8 md:py-8", sizeStyles[size], className)}>{children}</div>;
+  return <div className={cn("hidden-scrollbar mx-auto w-full px-4 py-6 md:px-8 md:py-8", sizeStyles[size], className)}>{children}</div>;
 }
 
 export { PageContainer };

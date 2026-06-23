@@ -8,6 +8,7 @@ import { AIRecommendationCard } from "@/components/tasks/ai-recommendation-card"
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { DependencySelect } from "./dependency-select";
 import { getApiErrorMessage } from "@/lib/api-errors";
 import { recommendAssignee } from "@/services/ai.service";
@@ -30,6 +31,7 @@ type TaskCreateModalProps = {
   tasks: Task[];
   assignees: { id: string; name: string; email: string }[];
   projectId?: string | null;
+  projectName?: string;
   onClose: () => void;
   onSubmit: (input: CreateTaskInput) => Promise<void>;
 };
@@ -73,7 +75,7 @@ function getPriorityReason(dueDate: string) {
   return "Deadline is 8 or more days away.";
 }
 
-function TaskCreateModal({ open, tasks, assignees, projectId, onClose, onSubmit }: TaskCreateModalProps) {
+function TaskCreateModal({ open, tasks, assignees, projectId, projectName, onClose, onSubmit }: TaskCreateModalProps) {
   const initialValues = useMemo<TaskCreateValues>(
     () => ({
       title: "",
@@ -95,6 +97,7 @@ function TaskCreateModal({ open, tasks, assignees, projectId, onClose, onSubmit 
   const [recommendation, setRecommendation] = useState<AIRecommendationData | null>(null);
   const [recommendationApplied, setRecommendationApplied] = useState(false);
   const [appliedRecommendationPayload, setAppliedRecommendationPayload] = useState<AIRecommendationPayload | null>(null);
+  const [requiredSkills, setRequiredSkills] = useState<string[]>([]);
 
   const suggestedPriority = useMemo(() => getSuggestedPriority(values.dueDate), [values.dueDate]);
   const effectivePriority = manualOverride ? values.priority : suggestedPriority;
@@ -105,7 +108,7 @@ function TaskCreateModal({ open, tasks, assignees, projectId, onClose, onSubmit 
         throw new Error("projectId is required");
       }
 
-      return recommendAssignee(projectId, values.requiredSkills);
+      return recommendAssignee(projectId, requiredSkills);
     },
     onMutate: () => {
       setRecommendationError(null);
@@ -134,6 +137,7 @@ function TaskCreateModal({ open, tasks, assignees, projectId, onClose, onSubmit 
     setRecommendationError(null);
     setRecommendationApplied(false);
     setAppliedRecommendationPayload(null);
+    setRequiredSkills([]);
   }, [initialValues, open]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -142,19 +146,26 @@ function TaskCreateModal({ open, tasks, assignees, projectId, onClose, onSubmit 
 
     setSubmitting(true);
     setError(null);
+    const payload = {
+      title: values.title.trim(),
+      description: values.description.trim() || undefined,
+      priority: effectivePriority,
+      projectId,
+      status: "TODO" as const,
+      dependsOnTaskId: values.dependsOnTaskId || undefined,
+      dueDate: values.dueDate || undefined,
+      estimateHours: values.estimateHours ? Number(values.estimateHours) : undefined,
+      assigneeId: values.assigneeId || undefined,
+      requiredSkills,
+      ...(appliedRecommendationPayload ?? {}),
+    };
+    // TEMP DEBUG: selected skills before submit and final request payload.
+    // eslint-disable-next-line no-console
+    console.log("[tasks.create.ui] selected skills before submit", requiredSkills);
+    // eslint-disable-next-line no-console
+    console.log("[tasks.create.ui] request payload", payload);
     try {
-      await onSubmit({
-        title: values.title.trim(),
-        description: values.description.trim() || undefined,
-        priority: effectivePriority,
-        projectId,
-        status: "TODO",
-        dependsOnTaskId: values.dependsOnTaskId || undefined,
-        dueDate: values.dueDate || undefined,
-        estimateHours: values.estimateHours ? Number(values.estimateHours) : undefined,
-        assigneeId: values.assigneeId || undefined,
-        ...(appliedRecommendationPayload ?? {}),
-      });
+      await onSubmit(payload);
       onClose();
     } catch (createError) {
       setError(getApiErrorMessage(createError, "Unable to create task."));
@@ -164,17 +175,17 @@ function TaskCreateModal({ open, tasks, assignees, projectId, onClose, onSubmit 
   }
 
   function handleUseRecommendation() {
-    if (!recommendation) {
+    if (!recommendation || ("recommendedUserId" in recommendation && recommendation.recommendedUserId === null)) {
       return;
     }
 
-    setValues((current) => ({ ...current, assigneeId: recommendation.recommendedUserId }));
+    setValues((current) => ({ ...current, assigneeId: recommendation.recommendedMember.id }));
     setRecommendationApplied(true);
     setAppliedRecommendationPayload({
-      aiRecommendedUserId: recommendation.recommendedUserId,
+      aiRecommendedUserId: recommendation.recommendedMember.id,
       aiRecommendationScore: recommendation.score,
       aiRecommendationConfidence: recommendation.confidence.toUpperCase() as "LOW" | "MEDIUM" | "HIGH",
-      aiRecommendationExplanation: recommendation.explanation,
+      aiRecommendationExplanation: recommendation.reasons,
     });
   }
 
@@ -185,7 +196,7 @@ function TaskCreateModal({ open, tasks, assignees, projectId, onClose, onSubmit 
         if (!nextOpen) onClose();
       }}
       title="Create task"
-      description="Add a new task to the current project with AI-driven priority guidance."
+      description={`Add a new task to ${projectName ?? "the current project"} with AI-driven priority guidance.`}
       size="lg"
     >
       <form className="grid gap-4 md:grid-cols-2" onSubmit={handleSubmit}>
@@ -203,21 +214,22 @@ function TaskCreateModal({ open, tasks, assignees, projectId, onClose, onSubmit 
           className="min-h-28 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white placeholder:text-white/30 outline-none transition focus:border-violet-400/40 focus:ring-2 focus:ring-violet-500/15 md:col-span-2"
         />
 
-        <label className="space-y-2 text-sm text-white/65">
+        <div className="space-y-2 text-sm text-white/65">
           <span className="text-xs uppercase tracking-[0.18em] text-white/45">Assign To</span>
-          <select
+          <Select
+            dropdownId="task-create-assignee"
             value={values.assigneeId}
-            onChange={(event) => setValues((current) => ({ ...current, assigneeId: event.target.value }))}
-            className="h-12 w-full appearance-none rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none transition focus:border-violet-400/40 focus:ring-2 focus:ring-violet-500/15"
-          >
-            <option value="">Unassigned</option>
-            {assignees.map((assignee) => (
-              <option key={assignee.id} value={assignee.id}>
-                {assignee.name} ({assignee.email})
-              </option>
-            ))}
-          </select>
-        </label>
+            onChange={(value) => setValues((current) => ({ ...current, assigneeId: value }))}
+            placeholder="Unassigned"
+            options={[
+              { value: "", label: "Unassigned" },
+              ...assignees.map((assignee) => ({
+                value: assignee.id,
+                label: `${assignee.name} (${assignee.email})`,
+              })),
+            ]}
+          />
+        </div>
 
         <div className="space-y-3 md:col-span-2">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -238,18 +250,15 @@ function TaskCreateModal({ open, tasks, assignees, projectId, onClose, onSubmit 
 
           <div className="flex flex-wrap gap-2">
             {SKILLS.map((skill) => {
-              const selected = values.requiredSkills.includes(skill);
+              const selected = requiredSkills.includes(skill);
               return (
                 <button
                   key={skill}
                   type="button"
                   onClick={() =>
-                    setValues((current) => ({
-                      ...current,
-                      requiredSkills: selected
-                        ? current.requiredSkills.filter((item) => item !== skill)
-                        : [...current.requiredSkills, skill],
-                    }))
+                    setRequiredSkills((current) =>
+                      selected ? current.filter((item) => item !== skill) : [...current, skill]
+                    )
                   }
                   className={`rounded-full border px-3 py-2 text-xs font-medium transition ${
                     selected ? "border-violet-400/30 bg-violet-500/15 text-violet-100" : "border-white/10 bg-white/5 text-white/65 hover:bg-white/10"

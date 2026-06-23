@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { setOpenDropdown, subscribeDropdown, getOpenDropdown } from "./dropdown-manager";
+import { cn } from "@/lib/utils";
 
 type Option = { value: string; label: React.ReactNode };
 
@@ -20,9 +21,11 @@ type SelectProps = {
 
 function Select({ id, value, options = [], placeholder = "Select...", disabled = false, className = "", onChange, dropdownId }: SelectProps) {
   const [open, setOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [placement, setPlacement] = useState<"down" | "up">("down");
   const [menuMaxHeight, setMenuMaxHeight] = useState<number | undefined>(undefined);
   const idRef = useRef<string>(dropdownId || id || `dropdown-${Math.random().toString(36).slice(2, 9)}`);
@@ -56,6 +59,21 @@ function Select({ id, value, options = [], placeholder = "Select...", disabled =
       document.removeEventListener("keydown", onEsc);
     };
   }, []);
+
+  useEffect(() => {
+    if (open) {
+      const selectedIndex = options.findIndex((o) => o.value === value);
+      setHighlightedIndex(selectedIndex >= 0 ? selectedIndex : 0);
+    } else {
+      setHighlightedIndex(-1);
+    }
+  }, [open, options, value]);
+
+  useEffect(() => {
+    if (!open) return;
+    const current = optionRefs.current[highlightedIndex];
+    current?.scrollIntoView({ block: "nearest" });
+  }, [highlightedIndex, open]);
 
   useEffect(() => {
     if (!open || !buttonRef.current || !dropdownRef.current) return;
@@ -108,6 +126,45 @@ function Select({ id, value, options = [], placeholder = "Select...", disabled =
     setOpen(false);
   }
 
+  function moveHighlight(direction: 1 | -1) {
+    if (options.length === 0) return;
+    setHighlightedIndex((current) => {
+      const normalized = current < 0 ? 0 : current;
+      const next = (normalized + direction + options.length) % options.length;
+      return next;
+    });
+  }
+
+  function handleKeyDown(event: React.KeyboardEvent<HTMLButtonElement>) {
+    if (!open) {
+      if (event.key === "ArrowDown" || event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        const mine = idRef.current;
+        setOpenDropdown(mine);
+        setOpen(true);
+      }
+      return;
+    }
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      moveHighlight(1);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      moveHighlight(-1);
+    } else if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      const option = options[highlightedIndex];
+      if (option) {
+        handleSelect(option.value);
+      }
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      setOpenDropdown(null);
+      setOpen(false);
+    }
+  }
+
   const selected = options.find((o) => o.value === value);
 
   return (
@@ -134,7 +191,11 @@ function Select({ id, value, options = [], placeholder = "Select...", disabled =
             setOpen(true);
           }
         }}
-        className={`h-12 w-full appearance-none rounded-[16px] border px-4 text-sm text-white outline-none transition flex items-center justify-between ${disabled ? "opacity-60 cursor-not-allowed" : ""} bg-black/20 border-white/10`}
+        onKeyDown={handleKeyDown}
+        className={cn(
+          "flex h-12 w-full items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none transition focus:border-violet-400/40 focus:ring-2 focus:ring-violet-500/15",
+          disabled ? "cursor-not-allowed opacity-60" : ""
+        )}
       >
         <span className="truncate text-left text-sm">{selected ? selected.label : placeholder}</span>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={`ml-3 text-white/40 transition-transform ${open ? "-rotate-180" : "rotate-0"}`}>
@@ -156,15 +217,15 @@ function Select({ id, value, options = [], placeholder = "Select...", disabled =
                 // when flipping up we'll position using bottom
                 bottom: placement === "up" ? window.innerHeight - (rect ? rect.top : 0) + 8 : undefined,
                 width,
-                background: "rgba(15,23,42,0.75)",
+                background: "rgba(15,23,42,0.82)",
                 backdropFilter: "blur(20px)",
                 WebkitBackdropFilter: "blur(20px)",
                 border: "1px solid rgba(255,255,255,0.08)",
                 boxShadow: "0 12px 40px rgba(0,0,0,0.35)",
-                borderRadius: 16,
+                borderRadius: 18,
                 maxHeight: menuMaxHeight,
                 overflow: "auto",
-                padding: 6,
+                padding: 8,
                 zIndex: 9999,
               };
 
@@ -173,15 +234,18 @@ function Select({ id, value, options = [], placeholder = "Select...", disabled =
                   ref={menuRef}
                   role="listbox"
                   aria-activedescendant={value}
-                  className={`transform-gpu transition-all duration-220 ease-out ${placement === "down" ? "origin-top" : "origin-bottom"}`}
+                  className={`hidden-scrollbar transform-gpu transition-all duration-220 ease-out ${placement === "down" ? "origin-top" : "origin-bottom"}`}
                   style={style}
                   onPointerDown={(e) => e.stopPropagation()}
                   onMouseDown={(e) => e.stopPropagation()}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {options.map((opt) => (
+                  {options.map((opt, index) => (
                     <button
                       key={opt.value}
+                      ref={(node) => {
+                        optionRefs.current[index] = node;
+                      }}
                       type="button"
                       onPointerDown={(e) => {
                         // debug: confirm pointer events reach the option before the menu closes
@@ -205,7 +269,11 @@ function Select({ id, value, options = [], placeholder = "Select...", disabled =
                         e.preventDefault();
                         e.stopPropagation();
                       }}
-                      className={`w-full rounded-lg px-3 py-2 text-left text-sm text-white transition-colors duration-150 ${opt.value === value ? "bg-[rgba(139,92,246,0.25)]" : "hover:bg-[rgba(139,92,246,0.18)]"}`}
+                      className={cn(
+                        "w-full rounded-xl px-3 py-2 text-left text-sm text-white transition-colors duration-150 outline-none",
+                        opt.value === value ? "bg-violet-500/20 text-violet-100" : "hover:bg-white/5 hover:text-white",
+                        options[highlightedIndex]?.value === opt.value ? "ring-1 ring-violet-400/40" : ""
+                      )}
                     >
                       {opt.label}
                     </button>

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { getApiErrorMessage } from "@/lib/api-errors";
 import { useToast } from "@/components/ui/toast";
 import { TaskBadges } from "./task-badges";
@@ -17,9 +18,11 @@ type TaskDetailModalProps = {
   open: boolean;
   task: Task | null;
   assignees: { id: string; name: string; email: string }[];
+  projectName?: string;
   onClose: () => void;
   onSubmit: (input: UpdateTaskInput) => Promise<void>;
   onDelete: (task: Task) => void;
+  onSchedule?: () => void;
 };
 
 type TaskDetailValues = {
@@ -30,7 +33,10 @@ type TaskDetailValues = {
   dueDate: string;
   estimateHours: string;
   assigneeId: string;
+  requiredSkills: string[];
 };
+
+const SKILLS = ["Frontend", "Backend", "AI/ML", "UI/UX", "Testing", "DevOps"] as const;
 
 function getSuggestedPriority(dueDate?: string | null) {
   if (!dueDate) return "MEDIUM";
@@ -80,7 +86,7 @@ function getConfidenceLabel(confidence?: Task["aiRecommendationConfidence"]) {
   return confidence.charAt(0) + confidence.slice(1).toLowerCase();
 }
 
-function TaskDetailModal({ open, task, assignees, onClose, onSubmit, onDelete }: TaskDetailModalProps) {
+function TaskDetailModal({ open, task, assignees, projectName, onClose, onSubmit, onDelete, onSchedule }: TaskDetailModalProps) {
   const { toast } = useToast();
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [values, setValues] = useState<TaskDetailValues>({
@@ -91,6 +97,7 @@ function TaskDetailModal({ open, task, assignees, onClose, onSubmit, onDelete }:
     dueDate: "",
     estimateHours: "",
     assigneeId: "",
+    requiredSkills: [],
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -101,6 +108,7 @@ function TaskDetailModal({ open, task, assignees, onClose, onSubmit, onDelete }:
   const coordinationExplanation = getCoordinationExplanation(task);
   const dependencySummary = getDependencySummary(dependencyNodes);
   const showAiAssignmentDecision = Boolean(task?.aiRecommendedUserId);
+  const aiRecommendationScore = typeof task?.aiRecommendationScore === "number" ? Math.round(task.aiRecommendationScore * 100) : null;
   const recommendedAssignee = useMemo(
     () => assignees.find((assignee) => assignee.id === task?.aiRecommendedUserId) ?? null,
     [assignees, task?.aiRecommendedUserId]
@@ -120,6 +128,7 @@ function TaskDetailModal({ open, task, assignees, onClose, onSubmit, onDelete }:
       dueDate: task.dueDate ? task.dueDate.slice(0, 10) : "",
       estimateHours: task.estimateHours ? String(task.estimateHours) : "",
       assigneeId: task.assigneeId ?? "",
+      requiredSkills: task.requiredSkills ?? [],
     });
     setError(null);
     setSubmitting(false);
@@ -138,6 +147,7 @@ function TaskDetailModal({ open, task, assignees, onClose, onSubmit, onDelete }:
         dueDate: values.dueDate || undefined,
         estimateHours: values.estimateHours ? Number(values.estimateHours) : undefined,
         assigneeId: values.assigneeId || undefined,
+        requiredSkills: values.requiredSkills,
       });
       toast({ title: "Task updated", description: values.title.trim() || task?.title, variant: "success" });
       setMode("view");
@@ -151,7 +161,7 @@ function TaskDetailModal({ open, task, assignees, onClose, onSubmit, onDelete }:
   if (!task) return null;
 
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()} title="Task details" description="Review the full task context, priority intelligence, and dependency state." size="xl">
+    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()} title="Task details" description={`Review the full task context for ${projectName ?? "this project"}, priority intelligence, and dependency state.`} size="xl">
       {mode === "edit" ? (
         <form className="space-y-5" onSubmit={handleSubmit}>
           <div className="space-y-3">
@@ -168,33 +178,77 @@ function TaskDetailModal({ open, task, assignees, onClose, onSubmit, onDelete }:
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
-            <label className="space-y-2 text-sm text-white/65">
+            <div className="space-y-2 text-sm text-white/65">
               <span className="text-xs uppercase tracking-[0.18em] text-white/40">Status</span>
-              <select value={values.status} onChange={(event) => setValues((current) => ({ ...current, status: event.target.value as TaskStatus }))} className="h-12 w-full appearance-none rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none transition focus:border-violet-400/40 focus:ring-2 focus:ring-violet-500/15">
-                {(["TODO", "IN_PROGRESS", "BLOCKED", "IN_REVIEW", "DONE", "CANCELED"] as const).map((status) => (
-                  <option key={status} value={status}>{status.replaceAll("_", " ")}</option>
-                ))}
-              </select>
-            </label>
-            <label className="space-y-2 text-sm text-white/65">
+              <Select
+                dropdownId="task-detail-status"
+                value={values.status}
+                onChange={(value) => setValues((current) => ({ ...current, status: value as TaskStatus }))}
+                options={(["TODO", "IN_PROGRESS", "BLOCKED", "IN_REVIEW", "DONE", "CANCELED"] as const).map((status) => ({
+                  value: status,
+                  label: status.replaceAll("_", " "),
+                }))}
+              />
+            </div>
+            <div className="space-y-2 text-sm text-white/65">
               <span className="text-xs uppercase tracking-[0.18em] text-white/40">Priority</span>
-              <select value={values.priority} onChange={(event) => setValues((current) => ({ ...current, priority: event.target.value as NonNullable<UpdateTaskInput["priority"]> }))} className="h-12 w-full appearance-none rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none transition focus:border-violet-400/40 focus:ring-2 focus:ring-violet-500/15">
-                {(["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const).map((priority) => <option key={priority} value={priority}>{priority}</option>)}
-              </select>
-            </label>
-            <label className="space-y-2 text-sm text-white/65">
+              <Select
+                dropdownId="task-detail-priority"
+                value={values.priority}
+                onChange={(value) => setValues((current) => ({ ...current, priority: value as NonNullable<UpdateTaskInput["priority"]> }))}
+                options={(["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const).map((priority) => ({
+                  value: priority,
+                  label: priority,
+                }))}
+              />
+            </div>
+            <div className="space-y-2 text-sm text-white/65">
               <span className="text-xs uppercase tracking-[0.18em] text-white/40">Assign To</span>
-              <select value={values.assigneeId} onChange={(event) => setValues((current) => ({ ...current, assigneeId: event.target.value }))} className="h-12 w-full appearance-none rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none transition focus:border-violet-400/40 focus:ring-2 focus:ring-violet-500/15">
-                <option value="">Unassigned</option>
-                {assignees.map((assignee) => (
-                  <option key={assignee.id} value={assignee.id}>{assignee.name} ({assignee.email})</option>
-                ))}
-              </select>
-            </label>
+              <Select
+                dropdownId="task-detail-assignee"
+                value={values.assigneeId}
+                onChange={(value) => setValues((current) => ({ ...current, assigneeId: value }))}
+                placeholder="Unassigned"
+                options={[
+                  { value: "", label: "Unassigned" },
+                  ...assignees.map((assignee) => ({
+                    value: assignee.id,
+                    label: `${assignee.name} (${assignee.email})`,
+                  })),
+                ]}
+              />
+            </div>
             <label className="space-y-2 text-sm text-white/65">
               <span className="text-xs uppercase tracking-[0.18em] text-white/40">Deadline</span>
               <Input type="date" value={values.dueDate} onChange={(event) => setValues((current) => ({ ...current, dueDate: event.target.value }))} className="h-12 rounded-2xl border-white/10 bg-white/5 text-white" />
             </label>
+            <div className="space-y-2 md:col-span-2">
+              <span className="text-xs uppercase tracking-[0.18em] text-white/40">Required Skills</span>
+              <div className="flex flex-wrap gap-2">
+                {SKILLS.map((skill) => {
+                  const selected = values.requiredSkills.includes(skill);
+                  return (
+                    <button
+                      key={skill}
+                      type="button"
+                      onClick={() =>
+                        setValues((current) => ({
+                          ...current,
+                          requiredSkills: selected
+                            ? current.requiredSkills.filter((item) => item !== skill)
+                            : [...current.requiredSkills, skill],
+                        }))
+                      }
+                      className={`rounded-full border px-3 py-2 text-xs font-medium transition ${
+                        selected ? "border-violet-400/30 bg-violet-500/15 text-violet-100" : "border-white/10 bg-white/5 text-white/65 hover:bg-white/10"
+                      }`}
+                    >
+                      {skill}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <label className="space-y-2 text-sm text-white/65 md:col-span-2">
               <span className="text-xs uppercase tracking-[0.18em] text-white/40">Estimated Duration</span>
               <Input type="number" min={1} step={1} value={values.estimateHours} onChange={(event) => setValues((current) => ({ ...current, estimateHours: event.target.value }))} className="h-12 rounded-2xl border-white/10 bg-white/5 text-white" />
@@ -235,7 +289,7 @@ function TaskDetailModal({ open, task, assignees, onClose, onSubmit, onDelete }:
                     Confidence: {getConfidenceLabel(task.aiRecommendationConfidence)}
                   </Badge>
                 ) : null}
-                {typeof task.aiRecommendationScore === "number" ? <Badge variant="blue">Score: {task.aiRecommendationScore}</Badge> : null}
+                {aiRecommendationScore !== null ? <Badge variant="blue">Match Score: {aiRecommendationScore}%</Badge> : null}
               </div>
 
               <div className="mt-4 grid gap-3 md:grid-cols-3">
@@ -249,7 +303,22 @@ function TaskDetailModal({ open, task, assignees, onClose, onSubmit, onDelete }:
                 </div>
                 <div className="rounded-xl border border-white/10 bg-black/20 p-3">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-white/40">Score</p>
-                  <p className="mt-1 text-sm text-white/85">{typeof task.aiRecommendationScore === "number" ? task.aiRecommendationScore : "Unknown"}</p>
+                  <p className="mt-1 text-sm text-white/85">{aiRecommendationScore !== null ? `${aiRecommendationScore}%` : "Unknown"}</p>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-white/40">Required Skills</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {(task.requiredSkills ?? []).length > 0 ? (
+                    (task.requiredSkills ?? []).map((skill) => (
+                      <span key={skill} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/75">
+                        {skill}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-sm text-white/55">No required skills saved.</span>
+                  )}
                 </div>
               </div>
 
@@ -273,6 +342,23 @@ function TaskDetailModal({ open, task, assignees, onClose, onSubmit, onDelete }:
             ) : (
               <p className="whitespace-pre-line text-sm text-white/50">{dependencySummary}</p>
             )}
+          </div>
+          <div className="rounded-2xl border border-violet-400/15 bg-violet-500/10 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-[0.18em] text-violet-100">Scheduling</p>
+                <p className="mt-2 text-sm text-white/75">
+                  {task.calendarEvent
+                    ? `Scheduled for ${new Date(task.calendarEvent.startTime).toLocaleString()}`
+                    : "This task is not scheduled yet."}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" onClick={onSchedule} className="rounded-2xl border-white/10 bg-white/5 text-white hover:bg-white/10">
+                  Schedule Task
+                </Button>
+              </div>
+            </div>
           </div>
           <div className="flex flex-col gap-3 md:flex-row md:justify-end">
             <Button type="button" variant="outline" onClick={() => setMode("edit")} className="rounded-2xl border-white/10 bg-white/5 text-white hover:bg-white/10">Edit</Button>

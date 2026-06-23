@@ -89,15 +89,14 @@ export async function transitionTask({ queryClient, projectId, taskId, action }:
   );
 
   try {
+    // eslint-disable-next-line no-console
+    console.log("[perf] mutation started: transitionTask", { action, taskId, projectId });
     await taskService.updateTask(taskId, backendPayload);
-
-    // Aggressively invalidate to refresh coordination state
-    await queryClient.invalidateQueries({ queryKey: queryKeys.tasks(projectId), refetchType: "active" });
-
+    // eslint-disable-next-line no-console
+    console.log("[perf] mutation finished: transitionTask", { action, taskId, projectId });
     return { action, newStatus };
   } catch (err) {
-    // Rollback: refetch full tasks list
-    await queryClient.invalidateQueries({ queryKey: queryKeys.tasks(projectId) });
+    queryClient.setQueryData<Task[]>(queryKeys.tasks(projectId), current);
     throw err;
   }
 }

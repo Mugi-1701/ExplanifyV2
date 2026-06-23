@@ -5,6 +5,7 @@ const createTaskSchema = z.object({
   description: z.string().optional(),
   status: z.enum(['TODO', 'IN_PROGRESS', 'BLOCKED', 'IN_REVIEW', 'DONE', 'CANCELED']).optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional(),
+  requiredSkills: z.array(z.string().trim().min(1).max(120)).optional().default([]),
   estimateHours: z.coerce.number().positive().optional().nullable(),
   startDate: z.string().datetime().optional().nullable(),
   dueDate: z.coerce.date().optional().nullable(),
@@ -24,6 +25,7 @@ const updateTaskSchema = z.object({
   description: z.string().optional(),
   status: z.enum(['TODO', 'IN_PROGRESS', 'BLOCKED', 'IN_REVIEW', 'DONE', 'CANCELED']).optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional(),
+  requiredSkills: z.array(z.string().trim().min(1).max(120)).optional(),
   estimateHours: z.coerce.number().positive().optional().nullable(),
   startDate: z.string().datetime().optional().nullable(),
   dueDate: z.coerce.date().optional().nullable(),
@@ -39,8 +41,17 @@ const createDependencySchema = z.object({
   dependsOnTaskId: z.string().uuid('Invalid dependsOnTaskId')
 });
 
+const scheduleTaskSchema = z.object({
+  date: z.coerce.date(),
+  startTime: z.string().trim().min(1),
+  durationMinutes: z.coerce.number().int().positive().max(24 * 60),
+  title: z.string().trim().min(1).max(255).optional(),
+  description: z.string().trim().max(5000).optional().nullable(),
+});
+
 module.exports = {
   createTaskSchema,
   updateTaskSchema,
-  createDependencySchema
+  createDependencySchema,
+  scheduleTaskSchema,
 };

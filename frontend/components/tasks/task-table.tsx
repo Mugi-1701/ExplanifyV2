@@ -4,6 +4,7 @@ import { CheckCircle2, Eye, GripVertical } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Select } from "@/components/ui/select";
 import type { CreateTaskInput, Task } from "@/types/task";
 import { TaskBadges } from "./task-badges";
 import { getTaskHealthLabel } from "./task-utils";
@@ -17,7 +18,7 @@ type TaskTableProps = {
 
 function TaskTable({ tasks, onSelectTask, onUpdateStatus, onUpdatePriority }: TaskTableProps) {
   return (
-    <Card className="overflow-hidden border-white/10 bg-white/[0.03]">
+    <Card className="hidden-scrollbar overflow-hidden border-white/10 bg-white/[0.03]">
       <div className="hidden border-b border-white/10 px-5 py-4 text-xs uppercase tracking-[0.18em] text-white/45 md:grid md:grid-cols-[1.45fr_0.85fr_0.85fr_0.95fr_0.8fr_0.55fr]">
         <span>Task</span>
         <span>Status</span>
@@ -37,6 +38,11 @@ function TaskTable({ tasks, onSelectTask, onUpdateStatus, onUpdatePriority }: Ta
                     <p className="font-medium text-white group-hover:text-violet-100">{task.title}</p>
                     <p className="mt-1 text-sm text-white/50">{task.description || "No description provided."}</p>
                     <p className="mt-2 text-xs text-white/40">Assigned To: {task.assignee?.name ?? "Unassigned"}</p>
+                    {task.calendarEvent ? (
+                      <p className="mt-1 text-xs text-violet-200">
+                        Scheduled: {new Date(task.calendarEvent.startTime).toLocaleString()}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               </button>
@@ -46,31 +52,29 @@ function TaskTable({ tasks, onSelectTask, onUpdateStatus, onUpdatePriority }: Ta
               </div>
 
               <div className="hidden md:block">
-                <select
+                <Select
+                  dropdownId={`task-table-status-${task.id}`}
                   value={task.status}
-                  onChange={(event) => onUpdateStatus(task, event.target.value as Task["status"])}
-                  className="h-11 w-full appearance-none rounded-xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none transition focus:border-violet-400/40 focus:ring-2 focus:ring-violet-500/15"
-                >
-                  {(["TODO", "IN_PROGRESS", "BLOCKED", "IN_REVIEW", "DONE", "CANCELED"] as const).map((status) => (
-                    <option key={status} value={status}>
-                      {status.replaceAll("_", " ")}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(value) => onUpdateStatus(task, value as Task["status"])}
+                  options={(["TODO", "IN_PROGRESS", "BLOCKED", "IN_REVIEW", "DONE", "CANCELED"] as const).map((status) => ({
+                    value: status,
+                    label: status.replaceAll("_", " "),
+                  }))}
+                  className="w-full"
+                />
               </div>
 
               <div className="hidden md:block">
-                <select
+                <Select
+                  dropdownId={`task-table-priority-${task.id}`}
                   value={task.priority ?? "MEDIUM"}
-                  onChange={(event) => onUpdatePriority(task, event.target.value as NonNullable<CreateTaskInput["priority"]>)}
-                  className="h-11 w-full appearance-none rounded-xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none transition focus:border-violet-400/40 focus:ring-2 focus:ring-violet-500/15"
-                >
-                  {(["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const).map((priority) => (
-                    <option key={priority} value={priority}>
-                      {priority}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(value) => onUpdatePriority(task, value as NonNullable<CreateTaskInput["priority"]>)}
+                  options={(["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const).map((priority) => ({
+                    value: priority,
+                    label: priority,
+                  }))}
+                  className="w-full"
+                />
               </div>
 
               <div className="hidden md:flex md:justify-end">

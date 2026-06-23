@@ -34,10 +34,7 @@ function ProjectInsightsCard({ project, activeTab, onTabChange, onAddMember, onE
 
   const members = project.members ?? [];
   const tasks = project.tasks ?? [];
-  // temporary debug to inspect tasks returned with project DTO
-  // eslint-disable-next-line no-console
-  console.log("Project Tasks", tasks);
-  const progress = project.progressPercentage ?? project.stats.progressPercentage;
+  const progress = project.progressPercentage ?? project.stats?.progressPercentage ?? 0;
 
   return (
     <Card className="border-white/10 bg-white/[0.03]">
@@ -47,8 +44,8 @@ function ProjectInsightsCard({ project, activeTab, onTabChange, onAddMember, onE
             <CardTitle className="text-xl text-white">{project.name}</CardTitle>
             <CardDescription className="mt-2 text-white/60">{project.description || "No description provided."}</CardDescription>
           </div>
-          <div className={`rounded-2xl border px-3 py-2 text-xs font-medium ${getCoordinationTone(project.stats.coordinationHealth)}`}>
-            {project.stats.coordinationHealth}
+          <div className={`rounded-2xl border px-3 py-2 text-xs font-medium ${getCoordinationTone(project.stats?.coordinationHealth ?? "EMPTY")}`}>
+            {project.stats?.coordinationHealth ?? "EMPTY"}
           </div>
         </div>
 
@@ -73,7 +70,7 @@ function ProjectInsightsCard({ project, activeTab, onTabChange, onAddMember, onE
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-4">
+      <CardContent className="hidden-scrollbar space-y-4">
         {activeTab === "overview" ? (
           <>
             <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/70">
@@ -81,7 +78,7 @@ function ProjectInsightsCard({ project, activeTab, onTabChange, onAddMember, onE
                 <Sparkles className="size-4" />
                 Project overview
               </div>
-              <p>{project.stats.coordinationReason}</p>
+              <p>{project.stats?.coordinationReason ?? "No task stats available yet."}</p>
             </div>
 
             <div className="grid gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70">
@@ -94,8 +91,8 @@ function ProjectInsightsCard({ project, activeTab, onTabChange, onAddMember, onE
               <div>Project lead: {project.members?.find((m) => m.role === "Tech Lead")?.user?.name ?? "Unassigned"}</div>
               <div>Start date: {(project.startDate && formatProjectDate(project.startDate)) ?? "—"}</div>
               <div>Target date: {(project.dueDate && formatProjectDate(project.dueDate)) ?? "—"}</div>
-              <div>Tasks: {project.stats.taskCount}</div>
-              <div>Blocked tasks: {project.stats.blockedTaskCount}</div>
+              <div>Tasks: {project.stats?.taskCount ?? 0}</div>
+              <div>Blocked tasks: {project.stats?.blockedTaskCount ?? 0}</div>
               <div>Team members: {members.length}</div>
             </div>
 
@@ -106,7 +103,7 @@ function ProjectInsightsCard({ project, activeTab, onTabChange, onAddMember, onE
                   <p className="mt-1 text-3xl font-semibold text-white">{progress}%</p>
                 </div>
                 <p className="text-sm text-white/50">
-                  {project.stats.completedTaskCount}/{project.stats.taskCount} tasks done
+                  {project.stats?.completedTaskCount ?? 0}/{project.stats?.taskCount ?? 0} tasks done
                 </p>
               </div>
               <div className="mt-4 h-2 rounded-full bg-white/10">

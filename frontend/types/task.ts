@@ -27,6 +27,7 @@ export type Task = {
   id: string;
   title: string;
   description?: string | null;
+  requiredSkills?: string[];
   status: TaskStatus;
   priority?: string | null;
   dueDate?: string | null;
@@ -50,6 +51,14 @@ export type Task = {
   coordinationState?: "BLOCKED" | "READY" | "ACTIVE" | "COMPLETED" | "DONE";
   dependencies?: TaskDependency[];
   coordinationSuggestions?: CoordinationSuggestionPayload[];
+  calendarEvent?: {
+    id: string;
+    title: string;
+    startTime: string;
+    endTime: string;
+    taskId?: string | null;
+    userId?: string;
+  } | null;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -59,6 +68,7 @@ export type TasksResponse = Task[];
 export type CreateTaskInput = {
   title: string;
   description?: string;
+  requiredSkills?: string[];
   status?: TaskStatus;
   priority?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
   projectId: string;
@@ -76,4 +86,12 @@ export type CreateTaskInput = {
 export type UpdateTaskInput = Partial<CreateTaskInput> & {
   status?: TaskStatus;
   coordinationState?: "BLOCKED" | "READY" | "ACTIVE" | "COMPLETED" | "DONE";
+};
+
+export type ScheduleTaskInput = {
+  date: string;
+  startTime: string;
+  durationMinutes: number;
+  title?: string;
+  description?: string | null;
 };

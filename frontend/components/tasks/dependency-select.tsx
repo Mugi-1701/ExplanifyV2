@@ -106,7 +106,7 @@ function DependencySelect({ value, onChange, tasks, excludeTaskId }: DependencyS
       </button>
 
       {isOpen && (
-        <div className="animate-in fade-in duration-150 rounded-2xl border border-purple-500/20 bg-[#1b1d31]/95 backdrop-blur-xl shadow-[0_0_30px_rgba(168,85,247,0.12)] overflow-hidden">
+        <div className="hidden-scrollbar animate-in fade-in duration-150 overflow-hidden rounded-2xl border border-purple-500/20 bg-[#1b1d31]/95 backdrop-blur-xl shadow-[0_0_30px_rgba(168,85,247,0.12)]">
           <div className="p-3 border-b border-white/10">
             <input
               ref={inputRef}
@@ -118,7 +118,7 @@ function DependencySelect({ value, onChange, tasks, excludeTaskId }: DependencyS
             />
           </div>
 
-          <div className="max-h-56 overflow-y-auto">
+          <div className="hidden-scrollbar max-h-56 overflow-y-auto">
             {dependencyCandidates.length === 0 ? (
               <div className="flex items-center justify-center px-4 py-6">
                 <div className="text-sm text-white/50">No available tasks</div>

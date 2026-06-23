@@ -1,5 +1,17 @@
 const { prisma } = require("../../lib/prisma");
 
+const calendarEventInclude = {
+  task: {
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      projectId: true,
+      assigneeId: true,
+    },
+  },
+};
+
 /**
  * CREATE TASK
  */
@@ -9,6 +21,7 @@ async function createTask(data) {
       title: data.title,
 
       description: data.description,
+      requiredSkills: data.requiredSkills ?? [],
 
       status: data.status || "TODO",
 
@@ -94,6 +107,9 @@ async function getTasksByProject(
           email: true,
         },
       },
+      calendarEvents: {
+        orderBy: { startTime: "asc" },
+      },
       // include dependency relations so callers can compute blocking state
       dependencies: {
         include: {
@@ -130,6 +146,9 @@ async function getTaskById(taskId) {
           name: true,
           email: true,
         },
+      },
+      calendarEvents: {
+        orderBy: { startTime: "asc" },
       },
 
       creator: {
@@ -180,6 +199,20 @@ async function deleteTask(taskId) {
     where: {
       id: taskId,
     },
+  });
+}
+
+async function createCalendarEvent(data) {
+  return prisma.calendarEvent.create({
+    data,
+    include: calendarEventInclude,
+  });
+}
+
+async function getCalendarEventById(id) {
+  return prisma.calendarEvent.findUnique({
+    where: { id },
+    include: calendarEventInclude,
   });
 }
 
@@ -318,6 +351,8 @@ module.exports = {
   getTaskById,
   updateTask,
   deleteTask,
+  createCalendarEvent,
+  getCalendarEventById,
   createDependency,
   removeDependency,
   getDependency,

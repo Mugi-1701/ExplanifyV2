@@ -14,8 +14,9 @@ import { resolveProjectId } from "@/services/task.service";
 import { useTasks } from "@/hooks/useTasks";
 import { useCoordinationSuggestion } from "@/hooks/useCoordinationSuggestion";
 import { buildProjectStats, useProjects } from "@/hooks/use-projects";
-import { createTask, deleteTask, updateTask } from "@/services/task.service";
-import type { CreateTaskInput, Task, UpdateTaskInput } from "@/types/task";
+import { useProjectDisplayName } from "@/hooks/use-project-display-name";
+import { createTask, deleteTask, scheduleTask as scheduleTaskRequest, updateTask } from "@/services/task.service";
+import type { CreateTaskInput, ScheduleTaskInput, Task, UpdateTaskInput } from "@/types/task";
 import type { ProjectWithStats } from "@/types/project";
 import { TaskCreateModal } from "./task-create-modal";
 import { TaskEmptyState } from "./task-empty-state";
@@ -23,6 +24,7 @@ import { TaskTable } from "./task-table";
 import { TaskToolbar } from "./task-toolbar";
 import { CoordinationInsights } from "./coordination-insights";
 import { TaskDetailModal } from "./task-detail-modal";
+import { TaskScheduleModal } from "./task-schedule-modal";
 import { SmartCoordinationToast } from "@/components/coordination/smart-coordination-toast";
 import { AIStatusSuggestionPopup } from "@/components/coordination/ai-status-suggestion-popup";
 import { useSmartStatusEngine, type SmartStatusSuggestion } from "@/hooks/useSmartStatusEngine";
@@ -68,6 +70,7 @@ function TasksPage({ projectId }: TasksPageProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const resolvedProjectId = useMemo(() => projectId ?? resolveProjectId() ?? null, [projectId]);
+  const projectName = useProjectDisplayName(resolvedProjectId);
   const { selectedProject } = useProjects();
   const {
     currentSuggestion,
@@ -82,6 +85,7 @@ function TasksPage({ projectId }: TasksPageProps) {
     name: member.user?.name ?? "Unknown member",
     email: member.user?.email ?? "",
   })) ?? [];
+  const hasProjectContext = Boolean(resolvedProjectId);
 
   // === AI STATUS ENGINE: Smart workflow assistance ===
   const [aiStatusSuggestion, setAiStatusSuggestion] = useState<SmartStatusSuggestion | null>(null);
@@ -103,6 +107,7 @@ function TasksPage({ projectId }: TasksPageProps) {
   const [priorityFilter, setPriorityFilter] = useState<"ALL" | NonNullable<CreateTaskInput["priority"]>>("ALL");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
+  const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const prevCoordinationMapRef = useRef<Map<string, string>>(new Map());
   const initialMountRef = useRef(true);
   const [showSyncing, setShowSyncing] = useState(false);
@@ -111,6 +116,9 @@ function TasksPage({ projectId }: TasksPageProps) {
   const createTaskMutation = useMutation({
     mutationFn: createTask,
     onMutate: async (input: CreateTaskInput) => {
+      // Temporary presentation-mode telemetry
+      // eslint-disable-next-line no-console
+      console.log("[perf] mutation started: createTask");
       const projectIdForMutation = input.projectId || resolvedProjectId;
 
       if (!projectIdForMutation) {
@@ -124,6 +132,7 @@ function TasksPage({ projectId }: TasksPageProps) {
         id: `optimistic-task-${Date.now()}`,
         title: input.title,
         description: input.description ?? null,
+        requiredSkills: input.requiredSkills ?? [],
         status: input.status ?? "TODO",
         priority: input.priority ?? "MEDIUM",
         projectId: projectIdForMutation,
@@ -167,10 +176,10 @@ function TasksPage({ projectId }: TasksPageProps) {
       updateProjectStatsCache(queryClient, context.projectId);
       syncProjectTasksCache(queryClient, context.projectId);
       void queryClient.invalidateQueries({ queryKey: queryKeys.tasks(context.projectId), refetchType: "active" });
-      // Force a fast refetch to ensure related coordination updates propagate immediately
-      void queryClient.invalidateQueries({ queryKey: queryKeys.tasks(context.projectId) });
       void queryClient.invalidateQueries({ queryKey: eventQueryKey("project", context.projectId) });
       recordInteraction(task.id);
+      // eslint-disable-next-line no-console
+      console.log("[perf] mutation finished: createTask");
       toast({
         title: "Task created",
         description: task.title,
@@ -182,6 +191,8 @@ function TasksPage({ projectId }: TasksPageProps) {
   const updateTaskMutation = useMutation({
     mutationFn: ({ taskId, input }: { taskId: string; input: UpdateTaskInput }) => updateTask(taskId, input),
     onMutate: async ({ taskId, input }) => {
+      // eslint-disable-next-line no-console
+      console.log("[perf] mutation started: updateTask");
       const currentProjectId = input.projectId || resolvedProjectId;
 
       await Promise.all([
@@ -238,7 +249,6 @@ function TasksPage({ projectId }: TasksPageProps) {
       );
       updateProjectStatsCache(queryClient, context.projectId);
       syncProjectTasksCache(queryClient, context.projectId);
-      void queryClient.invalidateQueries({ queryKey: queryKeys.tasks(context.projectId), refetchType: "active" });
       void queryClient.invalidateQueries({ queryKey: eventQueryKey("project", context.projectId) });
 
       if (variables.input.status !== undefined) {
@@ -254,12 +264,16 @@ function TasksPage({ projectId }: TasksPageProps) {
           variant: "success",
         });
       }
+      // eslint-disable-next-line no-console
+      console.log("[perf] mutation finished: updateTask");
     },
   });
 
   const deleteTaskMutation = useMutation({
     mutationFn: deleteTask,
     onMutate: async (taskId: string) => {
+      // eslint-disable-next-line no-console
+      console.log("[perf] mutation started: deleteTask");
       const currentTasks = queryClient.getQueryData<Task[]>(queryKeys.tasks(resolvedProjectId)) ?? [];
       const removedTask = currentTasks.find((task) => task.id === taskId) ?? null;
       const projectForMutation = removedTask?.projectId || resolvedProjectId;
@@ -307,11 +321,42 @@ function TasksPage({ projectId }: TasksPageProps) {
       );
       updateProjectStatsCache(queryClient, context.projectId);
       syncProjectTasksCache(queryClient, context.projectId);
-      void queryClient.invalidateQueries({ queryKey: queryKeys.tasks(context.projectId), refetchType: "active" });
       void queryClient.invalidateQueries({ queryKey: eventQueryKey("project", context.projectId) });
       toast({
         title: "Task deleted",
         variant: "success",
+      });
+      // eslint-disable-next-line no-console
+      console.log("[perf] mutation finished: deleteTask");
+    },
+  });
+
+  const scheduleTaskMutation = useMutation({
+    mutationFn: ({ taskId, input }: { taskId: string; input: ScheduleTaskInput }) => scheduleTaskRequest(taskId, input),
+    onSuccess: async (result) => {
+      queryClient.setQueryData<Task[]>(queryKeys.tasks(result.task.projectId ?? resolvedProjectId), (current = []) =>
+        current.map((task) => (task.id === result.task.id ? result.task : task))
+      );
+      if (result.task.projectId ?? resolvedProjectId) {
+        const projectKey = result.task.projectId ?? resolvedProjectId!;
+        updateProjectStatsCache(queryClient, projectKey);
+        syncProjectTasksCache(queryClient, projectKey);
+        void queryClient.invalidateQueries({ queryKey: queryKeys.tasks(projectKey) });
+      }
+      toast({
+        title: "Task scheduled",
+        description: result.task.title,
+        variant: "success",
+      });
+      setIsScheduleOpen(false);
+      // eslint-disable-next-line no-console
+      console.log("[perf] mutation finished: scheduleTask");
+    },
+    onError: (mutationError) => {
+      toast({
+        title: "Scheduling failed",
+        description: getApiErrorMessage(mutationError, "Unable to schedule this task."),
+        variant: "error",
       });
     },
   });
@@ -381,6 +426,14 @@ function TasksPage({ projectId }: TasksPageProps) {
       updateProjectStatsCache(queryClient, resolvedProjectId);
     }
   }, [queryClient, resolvedProjectId, tasks]);
+
+  const handleRefetch = useCallback(async () => {
+    // eslint-disable-next-line no-console
+    console.log("[perf] refetch started: tasks");
+    await refetch();
+    // eslint-disable-next-line no-console
+    console.log("[perf] refetch finished: tasks");
+  }, [refetch]);
 
   // Detect coordination state transitions and trigger suggestion popups
   useEffect(() => {
@@ -573,7 +626,7 @@ function TasksPage({ projectId }: TasksPageProps) {
   }
 
   if (error && tasks.length === 0) {
-    return <DashboardErrorCard message={error} onRetry={() => void refetch()} />;
+    return <DashboardErrorCard message={error} onRetry={() => void handleRefetch()} />;
   }
 
   return (
@@ -581,7 +634,7 @@ function TasksPage({ projectId }: TasksPageProps) {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: "easeOut" }}
-      className="space-y-6 px-4 py-6 md:px-8 md:py-8"
+      className="hidden-scrollbar space-y-6 px-4 py-6 md:px-8 md:py-8"
     >
       <section className="space-y-3">
         <p className="text-sm uppercase tracking-[0.22em] text-violet-200/80">Task Management</p>
@@ -593,7 +646,7 @@ function TasksPage({ projectId }: TasksPageProps) {
             </p>
           </div>
           <div className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/70 backdrop-blur-xl">
-            Project: <span className="text-white">{resolvedProjectId ?? "Active project"}</span>
+            Project: <span className="text-white">{projectName}</span>
           </div>
         </div>
       </section>
@@ -637,15 +690,19 @@ function TasksPage({ projectId }: TasksPageProps) {
           onCreateTask={() => setIsCreateTaskOpen(true)}
         />
 
-        {filteredTasks.length === 0 ? (
+        {!hasProjectContext ? (
           <TaskEmptyState
-            title={hasActiveFilters ? "No matching tasks" : resolvedProjectId ? "No tasks yet" : "No active project selected"}
+            title="No active project selected"
+            description="Select or create a project before creating tasks."
+            detail="Tasks, coordination insights, and AI explanations will appear here once a project exists."
+          />
+        ) : filteredTasks.length === 0 ? (
+          <TaskEmptyState
+            title={hasActiveFilters ? "No matching tasks" : "No tasks yet"}
             description={
               hasActiveFilters
                 ? "Adjust the current search or filters to see more live tasks."
-                : resolvedProjectId
-                  ? "Create the first task for this project and the AI coordination layer will start tracking dependencies."
-                  : "Select or create a project before creating tasks."
+                : "Create the first task for this project and the AI coordination layer will start tracking dependencies."
             }
             detail={
               hasActiveFilters
@@ -683,6 +740,7 @@ function TasksPage({ projectId }: TasksPageProps) {
         tasks={tasks}
         assignees={assignees}
         projectId={resolvedProjectId}
+        projectName={projectName}
         onClose={() => setIsCreateTaskOpen(false)}
         onSubmit={handleCreate}
       />
@@ -691,9 +749,23 @@ function TasksPage({ projectId }: TasksPageProps) {
         open={Boolean(selectedTask)}
         task={selectedTask}
         assignees={assignees}
+        projectName={projectName}
         onClose={() => setSelectedTaskId(null)}
         onSubmit={handleUpdateTask}
         onDelete={handleDelete}
+        onSchedule={() => setIsScheduleOpen(true)}
+      />
+
+      <TaskScheduleModal
+        open={isScheduleOpen}
+        task={selectedTask}
+        onClose={() => setIsScheduleOpen(false)}
+        onSubmit={(input) => {
+          if (!selectedTask) {
+            return Promise.reject(new Error("No task selected"));
+          }
+          return scheduleTaskMutation.mutateAsync({ taskId: selectedTask.id, input });
+        }}
       />
 
       {/* Smart Coordination Toast */}

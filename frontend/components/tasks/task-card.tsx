@@ -6,6 +6,7 @@ import { AlertCircle, CheckCircle2, Edit3, Trash2, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select } from "@/components/ui/select";
 import type { CreateTaskInput, Task } from "@/types/task";
 import { TaskBadges } from "./task-badges";
 import { getTaskDependencyNodes } from "./task-utils";
@@ -58,6 +59,11 @@ function TaskCard({ task, onUpdateStatus, onUpdatePriority, onDelete, onEdit, on
             </Badge>
             <Badge variant="muted">Assigned {task.assignee?.name ?? "Unassigned"}</Badge>
             {formattedUpdatedAt ? <Badge variant="muted">Updated {formattedUpdatedAt}</Badge> : null}
+            {task.calendarEvent ? (
+              <Badge variant="blue">
+                Scheduled {new Date(task.calendarEvent.startTime).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+              </Badge>
+            ) : null}
           </div>
 
           <TaskBadges task={task} />
@@ -96,32 +102,30 @@ function TaskCard({ task, onUpdateStatus, onUpdatePriority, onDelete, onEdit, on
           <div className="grid gap-3 md:grid-cols-2">
             <label className="space-y-2 text-xs uppercase tracking-[0.18em] text-white/45">
               Status
-              <select
+              <Select
+                dropdownId={`task-card-status-${task.id}`}
                 value={task.status}
-                onChange={(event) => onUpdateStatus(task, event.target.value as Task["status"])}
-                className="mt-2 h-11 w-full appearance-none rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none transition focus:border-violet-400/40 focus:ring-2 focus:ring-violet-500/15"
-              >
-                {(["TODO", "IN_PROGRESS", "BLOCKED", "IN_REVIEW", "DONE", "CANCELED"] as const).map((status) => (
-                  <option key={status} value={status}>
-                    {status.replaceAll("_", " ")}
-                  </option>
-                ))}
-              </select>
+                onChange={(value) => onUpdateStatus(task, value as Task["status"])}
+                options={(["TODO", "IN_PROGRESS", "BLOCKED", "IN_REVIEW", "DONE", "CANCELED"] as const).map((status) => ({
+                  value: status,
+                  label: status.replaceAll("_", " "),
+                }))}
+                className="mt-2 w-full"
+              />
             </label>
 
             <label className="space-y-2 text-xs uppercase tracking-[0.18em] text-white/45">
               Priority
-              <select
+              <Select
+                dropdownId={`task-card-priority-${task.id}`}
                 value={task.priority ?? "MEDIUM"}
-                onChange={(event) => onUpdatePriority(task, event.target.value as NonNullable<CreateTaskInput["priority"]>)}
-                className="mt-2 h-11 w-full appearance-none rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none transition focus:border-violet-400/40 focus:ring-2 focus:ring-violet-500/15"
-              >
-                {(["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const).map((priority) => (
-                  <option key={priority} value={priority}>
-                    {priority}
-                  </option>
-                ))}
-              </select>
+                onChange={(value) => onUpdatePriority(task, value as NonNullable<CreateTaskInput["priority"]>)}
+                options={(["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const).map((priority) => ({
+                  value: priority,
+                  label: priority,
+                }))}
+                className="mt-2 w-full"
+              />
             </label>
           </div>
 

@@ -143,7 +143,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 function DesktopSidebar({ user, onLogout }: { user?: SidebarProps["user"]; onLogout: () => void }) {
   return (
     <aside className="hidden md:fixed md:inset-y-0 md:left-0 md:z-40 md:flex md:w-72 md:flex-col md:bg-[radial-gradient(circle_at_top,rgba(168,85,247,0.12),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.12),transparent_24%),linear-gradient(to_bottom,rgba(6,8,22,0.96),rgba(5,8,22,0.98))] md:px-5 md:py-5 md:shadow-[0_0_80px_rgba(2,6,23,0.65)]">
-      <div className="flex h-full flex-col gap-4 px-1 py-1">
+      <div className="hidden-scrollbar flex h-full flex-col gap-4 overflow-y-auto px-1 py-1">
         <SidebarBrand />
 
         <div className="flex-1 py-1">
@@ -177,7 +177,7 @@ function MobileSidebar({ isOpen, onClose, user, onLogout }: { isOpen: boolean; o
             className="fixed inset-y-0 left-0 z-50 w-[88vw] max-w-sm bg-[radial-gradient(circle_at_top,rgba(168,85,247,0.12),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.12),transparent_24%),linear-gradient(to_bottom,rgba(6,8,22,0.98),rgba(5,8,22,0.99))] p-4 shadow-[0_0_90px_rgba(2,6,23,0.75)] md:hidden"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="flex h-full flex-col gap-4 px-1 py-1">
+            <div className="hidden-scrollbar flex h-full flex-col gap-4 overflow-y-auto px-1 py-1">
               <div className="flex items-start justify-between gap-4">
                 <SidebarBrand />
                 <button

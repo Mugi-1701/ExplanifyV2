@@ -14,6 +14,7 @@ const {
   updateProjectMember,
   removeProjectMember,
   getProjectTaskCountsByAssignee,
+  normalizeProjectRole,
 } = require("./project.repository");
 const { prisma } = require("../../lib/prisma");
 const { getRoleById } = require("../catalog/roles.repository");
@@ -130,7 +131,6 @@ const attachStats = (project) => {
 
   const { tasks = [], ...projectData } = project;
   const stats = buildProjectStats(tasks);
-  // expose teamCode as teamId for frontend compatibility (frontend expects a short code on project.teamId)
   const dto = {
     ...projectData,
     progressPercentage: stats.progressPercentage,
@@ -138,11 +138,6 @@ const attachStats = (project) => {
     members: project.members ?? [],
     tasks,
   };
-
-  if (project.teamCode) {
-    // set project.teamId to the teamCode so frontend can display it as requested
-    dto.teamId = project.teamCode;
-  }
 
   return dto;
 };
@@ -168,29 +163,10 @@ const createProjectService = async ({
 
   const resolvedSlug = slug ?? `${slugify(name)}-${Date.now().toString(36)}`;
 
-  // Generate a unique 4-digit team code if not provided and persist on project
-  let teamCode = null;
-  if (!teamId) {
-    // try to generate a unique 4-digit code
-    const gen = () => String(Math.floor(1000 + Math.random() * 9000));
-    for (let i = 0; i < 10; i++) {
-      const candidate = gen();
-      // check uniqueness across existing projects
-      // using prisma directly here for a quick uniqueness check
-      // eslint-disable-next-line no-await-in-loop
-      const existing = await prisma.project.findFirst({ where: { teamCode: candidate } });
-      if (!existing) {
-        teamCode = candidate;
-        break;
-      }
-    }
-  }
-
   const project = await createProject({
     orgId,
     ownerId: userId,
     teamId: teamId ?? null,
-    teamCode: teamCode ?? null,
     name,
     slug: resolvedSlug,
     description,
@@ -283,10 +259,10 @@ const listProjectMembersService = async ({ projectId, userId }) => {
     getProjectTaskCountsByAssignee(projectId),
   ]);
 
-  return members.map((member) => ({
+return members.map((member) => ({
     ...member,
     roleId: member.roleId ?? null,
-    role: member.roleRef?.name ?? member.role,
+    role: formatProjectRoleLabel(member.roleRef?.name ?? member.role),
     skillIds:
       Array.isArray(member.memberSkills) && member.memberSkills.length > 0
         ? member.memberSkills.map((entry) => entry.skillId)
@@ -303,6 +279,17 @@ function getMemberRole(member) {
   return member?.role ?? null;
 }
 
+function formatProjectRoleLabel(role) {
+  switch (normalizeProjectRole(role)) {
+    case "OWNER":
+      return "Owner";
+    case "LEAD":
+      return "Lead";
+    default:
+      return "Member";
+  }
+}
+
 function canManageProject(member) {
   return ["Tech Lead", "Owner", "Admin"].includes(getMemberRole(member) ?? "");
 }
@@ -313,9 +300,9 @@ async function resolveRoleName({ workspaceId, roleId, role }) {
     if (!roleRecord || roleRecord.workspaceId !== workspaceId) {
       throw new AppError("Role not found", 404);
     }
-    return { roleId: roleRecord.id, role: roleRecord.name };
+    return { roleId: roleRecord.id, role: formatProjectRoleLabel(roleRecord.name) };
   }
-  return { roleId: null, role: role || "Member" };
+  return { roleId: null, role: formatProjectRoleLabel(role) };
 }
 
 async function resolveSkills({ workspaceId, skillIds = [] }) {

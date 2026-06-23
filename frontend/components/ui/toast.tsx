@@ -86,7 +86,7 @@ function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="pointer-events-none fixed bottom-4 right-4 z-[70] flex w-[calc(100vw-2rem)] max-w-sm flex-col gap-3">
+      <div className="hidden-scrollbar pointer-events-none fixed bottom-4 right-4 z-[70] flex w-[calc(100vw-2rem)] max-w-sm flex-col gap-3">
         <AnimatePresence initial={false}>
           {toasts.map((message) => (
             <ToastItem key={message.id} message={message} onDismiss={() => dismiss(message.id)} />

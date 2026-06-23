@@ -474,7 +474,7 @@ function Combobox({
               className="h-10 w-full bg-transparent text-sm text-white outline-none placeholder:text-white/30"
             />
           </div>
-          <div className="mt-2 max-h-52 overflow-y-auto">
+          <div className="hidden-scrollbar mt-2 max-h-52 overflow-y-auto">
             {options.length > 0 ? (
               options.map((option) => (
                 <div

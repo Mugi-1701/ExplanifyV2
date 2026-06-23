@@ -1,4 +1,4 @@
 ALTER TABLE "ProjectMember"
 DROP COLUMN IF EXISTS "accessLevel",
 DROP COLUMN IF EXISTS "position",
-ALTER COLUMN "role" SET DEFAULT 'Member';
+ALTER COLUMN "role" SET DEFAULT 'MEMBER';

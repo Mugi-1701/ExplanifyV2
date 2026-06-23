@@ -6,6 +6,7 @@ import type React from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { getApiErrorMessage } from "@/lib/api-errors";
 import type { Task, TaskStatus, UpdateTaskInput } from "@/types/task";
 
@@ -15,7 +16,10 @@ type TaskFormValues = {
   status: TaskStatus;
   priority: NonNullable<UpdateTaskInput["priority"]>;
   assigneeId: string;
+  requiredSkills: string[];
 };
+
+const SKILLS = ["Frontend", "Backend", "AI/ML", "UI/UX", "Testing", "DevOps"] as const;
 
 type TaskEditModalProps = {
   open: boolean;
@@ -33,6 +37,7 @@ function TaskEditModal({ open, task, assignees, onClose, onSubmit }: TaskEditMod
       status: task?.status ?? "TODO",
       priority: (task?.priority as NonNullable<UpdateTaskInput["priority"]>) ?? "MEDIUM",
       assigneeId: task?.assigneeId ?? "",
+      requiredSkills: task?.requiredSkills ?? [],
     }),
     [task]
   );
@@ -61,14 +66,21 @@ function TaskEditModal({ open, task, assignees, onClose, onSubmit }: TaskEditMod
 
     setSubmitting(true);
     setError(null);
+    const payload = {
+      title: values.title.trim(),
+      description: values.description.trim() || undefined,
+      status: values.status,
+      priority: values.priority,
+      assigneeId: values.assigneeId || undefined,
+      requiredSkills: values.requiredSkills,
+    };
+    // TEMP DEBUG: selected skills before submit and final request payload.
+    // eslint-disable-next-line no-console
+    console.log("[tasks.update.ui] selected skills before submit", values.requiredSkills);
+    // eslint-disable-next-line no-console
+    console.log("[tasks.update.ui] request payload", payload);
     try {
-      await onSubmit({
-        title: values.title.trim(),
-        description: values.description.trim() || undefined,
-        status: values.status,
-        priority: values.priority,
-        assigneeId: values.assigneeId || undefined,
-      });
+      await onSubmit(payload);
       onClose();
     } catch (submitError) {
       setError(getApiErrorMessage(submitError, "Unable to save task changes."));
@@ -102,56 +114,81 @@ function TaskEditModal({ open, task, assignees, onClose, onSubmit }: TaskEditMod
           className="min-h-32 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white placeholder:text-white/30 outline-none transition focus:border-violet-400/40 focus:ring-2 focus:ring-violet-500/15 md:col-span-2"
         />
 
-        <label className="space-y-2 text-sm text-white/65">
+        <div className="space-y-2 text-sm text-white/65">
           <span className="text-xs uppercase tracking-[0.18em] text-white/45">Assign To</span>
-          <select
+          <Select
+            dropdownId="task-edit-assignee"
             value={values.assigneeId}
-            onChange={(event) => setValues((current) => ({ ...current, assigneeId: event.target.value }))}
-            className="h-12 w-full appearance-none rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none transition focus:border-violet-400/40 focus:ring-2 focus:ring-violet-500/15"
-          >
-            <option value="">Unassigned</option>
-            {assignees.map((assignee) => (
-              <option key={assignee.id} value={assignee.id}>
-                {assignee.name} ({assignee.email})
-              </option>
-            ))}
-          </select>
-        </label>
+            onChange={(value) => setValues((current) => ({ ...current, assigneeId: value }))}
+            placeholder="Unassigned"
+            options={[
+              { value: "", label: "Unassigned" },
+              ...assignees.map((assignee) => ({
+                value: assignee.id,
+                label: `${assignee.name} (${assignee.email})`,
+              })),
+            ]}
+          />
+        </div>
 
-        <label className="space-y-2 text-sm text-white/65">
+        <div className="space-y-2 text-sm text-white/65">
           <span className="text-xs uppercase tracking-[0.18em] text-white/45">Status</span>
-          <select
+          <Select
+            dropdownId="task-edit-status"
             value={values.status}
-            onChange={(event) => setValues((current) => ({ ...current, status: event.target.value as TaskStatus }))}
-            className="h-12 w-full appearance-none rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none transition focus:border-violet-400/40 focus:ring-2 focus:ring-violet-500/15"
-          >
-            {(["TODO", "IN_PROGRESS", "BLOCKED", "IN_REVIEW", "DONE", "CANCELED"] as const).map((status) => (
-              <option key={status} value={status}>
-                {status.replaceAll("_", " ")}
-              </option>
-            ))}
-          </select>
-        </label>
+            onChange={(value) => setValues((current) => ({ ...current, status: value as TaskStatus }))}
+            options={(["TODO", "IN_PROGRESS", "BLOCKED", "IN_REVIEW", "DONE", "CANCELED"] as const).map((status) => ({
+              value: status,
+              label: status.replaceAll("_", " "),
+            }))}
+          />
+        </div>
 
-        <label className="space-y-2 text-sm text-white/65">
+        <div className="space-y-2 text-sm text-white/65">
           <span className="text-xs uppercase tracking-[0.18em] text-white/45">Priority</span>
-          <select
+          <Select
+            dropdownId="task-edit-priority"
             value={values.priority}
-            onChange={(event) =>
+            onChange={(value) =>
               setValues((current) => ({
                 ...current,
-                priority: event.target.value as NonNullable<UpdateTaskInput["priority"]>,
+                priority: value as NonNullable<UpdateTaskInput["priority"]>,
               }))
             }
-            className="h-12 w-full appearance-none rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none transition focus:border-violet-400/40 focus:ring-2 focus:ring-violet-500/15"
-          >
-            {(["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const).map((priority) => (
-              <option key={priority} value={priority}>
-                {priority}
-              </option>
-            ))}
-          </select>
-        </label>
+            options={(["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const).map((priority) => ({
+              value: priority,
+              label: priority,
+            }))}
+          />
+        </div>
+
+        <div className="space-y-2 md:col-span-2">
+          <span className="text-xs uppercase tracking-[0.18em] text-white/45">Required Skills</span>
+          <div className="flex flex-wrap gap-2">
+            {SKILLS.map((skill) => {
+              const selected = values.requiredSkills.includes(skill);
+              return (
+                <button
+                  key={skill}
+                  type="button"
+                  onClick={() =>
+                    setValues((current) => ({
+                      ...current,
+                      requiredSkills: selected
+                        ? current.requiredSkills.filter((item) => item !== skill)
+                        : [...current.requiredSkills, skill],
+                    }))
+                  }
+                  className={`rounded-full border px-3 py-2 text-xs font-medium transition ${
+                    selected ? "border-violet-400/30 bg-violet-500/15 text-violet-100" : "border-white/10 bg-white/5 text-white/55 hover:bg-white/10"
+                  }`}
+                >
+                  {skill}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         {error ? <div className="rounded-2xl border border-rose-300/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100 md:col-span-2">{error}</div> : null}
 

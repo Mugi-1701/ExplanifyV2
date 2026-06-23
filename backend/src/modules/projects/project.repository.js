@@ -1,5 +1,27 @@
 const { prisma } = require("../../lib/prisma");
 
+function normalizeProjectRole(role) {
+  if (!role) {
+    return "MEMBER";
+  }
+
+  const normalized = String(role).trim().toUpperCase();
+
+  if (normalized === "LEAD" || normalized === "TECH LEAD") {
+    return "LEAD";
+  }
+
+  if (normalized === "OWNER") {
+    return "OWNER";
+  }
+
+  if (normalized === "MEMBER") {
+    return "MEMBER";
+  }
+
+  return "MEMBER";
+}
+
 const projectInclude = {
   owner: { select: { id: true, name: true, email: true } },
   organization: { select: { id: true, name: true, slug: true } },
@@ -45,13 +67,12 @@ const projectInclude = {
 /**
  * Create a new project record.
  */
-const createProject = async ({ orgId, ownerId, teamId, teamCode, name, slug, description, status, startDate, dueDate }) =>
+const createProject = async ({ orgId, ownerId, teamId, name, slug, description, status, startDate, dueDate }) =>
   prisma.project.create({
     data: {
       orgId,
       ownerId,
       teamId: teamId ?? null,
-      teamCode: teamCode ?? null,
       name,
       slug: slug ?? null,
       description: description ?? null,
@@ -152,7 +173,7 @@ const addProjectMember = async ({ projectId, userId, roleId = null, role = "Memb
       projectId,
       userId,
       roleId,
-      role,
+      role: normalizeProjectRole(role),
       skills,
       memberSkills: skillIds.length
         ? {
@@ -189,7 +210,7 @@ const updateProjectMember = async (projectId, userId, data) =>
       },
       data: {
         roleId: data.roleId,
-        role: data.role,
+        role: normalizeProjectRole(data.role),
         skills: data.skills,
       },
       include: {
@@ -306,4 +327,5 @@ module.exports = {
   updateProjectMember,
   removeProjectMember,
   getProjectTaskCountsByAssignee,
+  normalizeProjectRole,
 };

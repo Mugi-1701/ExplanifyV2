@@ -82,7 +82,7 @@ function Dialog({ open, onOpenChange, title, description, children, footer, size
             aria-modal="true"
             aria-label={title}
           >
-            <Card className="flex max-h-[85vh] flex-col border-white/10 bg-[#09111f]/95 shadow-[0_35px_110px_-30px_rgba(0,0,0,0.88)] backdrop-blur-2xl">
+            <Card className="hidden-scrollbar flex max-h-[85vh] flex-col border-white/10 bg-[#09111f]/95 shadow-[0_35px_110px_-30px_rgba(0,0,0,0.88)] backdrop-blur-2xl">
               <CardHeader className="flex-row items-start justify-between gap-4 pb-4">
                 <div className="space-y-1">
                   <CardTitle className="text-2xl text-white">{title}</CardTitle>
@@ -99,7 +99,7 @@ function Dialog({ open, onOpenChange, title, description, children, footer, size
                   <X className="size-4" />
                 </Button>
               </CardHeader>
-              <CardContent className="min-h-0 flex-1 space-y-6 overflow-y-auto">{children}</CardContent>
+              <CardContent className="hidden-scrollbar min-h-0 flex-1 space-y-6 overflow-y-auto">{children}</CardContent>
               {footer ? <div className="border-t border-white/10 px-6 py-5">{footer}</div> : null}
             </Card>
           </motion.div>

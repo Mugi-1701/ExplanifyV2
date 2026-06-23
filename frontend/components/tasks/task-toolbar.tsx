@@ -1,10 +1,10 @@
 "use client";
 
-import { Plus, Search, Filter } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { TaskFilterDropdown } from "./task-filter-dropdown";
+import { Select } from "@/components/ui/select";
 import type { CreateTaskInput, Task } from "@/types/task";
 
 type TaskToolbarProps = {
@@ -64,21 +64,24 @@ function TaskToolbar({
 
         <div className="flex items-stretch gap-3 md:flex-[0.32] md:justify-end lg:flex-[0.28] xl:flex-[0.25]">
           <div className="flex-1 md:flex-none md:min-w-40">
-            <TaskFilterDropdown
+            <Select
+              dropdownId="task-status-filter"
               value={statusFilter}
               onChange={(value) => onStatusFilterChange(value as "ALL" | Task["status"])}
               options={statusOptions}
-              icon={<Filter className="size-4 text-white/50" />}
               placeholder="Status"
+              className="w-full"
             />
           </div>
 
           <div className="flex-1 md:flex-none md:min-w-40">
-            <TaskFilterDropdown
+            <Select
+              dropdownId="task-priority-filter"
               value={priorityFilter}
               onChange={(value) => onPriorityFilterChange(value as "ALL" | NonNullable<CreateTaskInput["priority"]>)}
               options={priorityOptions}
               placeholder="Priority"
+              className="w-full"
             />
           </div>
 

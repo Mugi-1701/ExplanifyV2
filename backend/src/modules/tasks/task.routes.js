@@ -17,6 +17,7 @@ const {
   createTaskSchema,
   updateTaskSchema,
   createDependencySchema,
+  scheduleTaskSchema,
 } = require("./task.validation");
 
 /**
@@ -96,6 +97,18 @@ router.post(
   extractTasksContext,
   requireOrgMembership(),
   taskController.addDependency
+);
+
+/**
+ * SCHEDULE TASK
+ * POST /api/tasks/:taskId/schedule
+ */
+router.post(
+  "/:taskId/schedule",
+  taskMiddleware.loadTask,
+  requireOrgMembership(),
+  validate(scheduleTaskSchema),
+  taskController.scheduleTask
 );
 
 /**

@@ -1,18 +1,12 @@
-export type AIRecommendationData = {
-  recommendedUserId: string;
-  recommendedName: string;
-  score: number;
-  confidence: "low" | "medium" | "high";
-  explanation: string[];
+export type AIWorkloadMember = {
+  memberId: string;
+  memberName: string;
+  activeTasks: number;
+  calendarHours: number;
+  utilization: number;
+  status: "AVAILABLE" | "HEALTHY" | "BUSY" | "OVERLOADED";
 };
 
-export type AIRecommendationResponse = {
-  data: AIRecommendationData;
-};
-
-export type AIRecommendationPayload = {
-  aiRecommendedUserId?: string | null;
-  aiRecommendationScore?: number | null;
-  aiRecommendationConfidence?: "LOW" | "MEDIUM" | "HIGH" | null;
-  aiRecommendationExplanation?: string[] | null;
+export type AIWorkloadResponse = {
+  data: AIWorkloadMember[];
 };

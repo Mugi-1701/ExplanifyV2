@@ -5,7 +5,12 @@ const { AppError } = require("../../utils/AppError");
 
 const authenticate = () => async (req, res, next) => {
   const header = req.headers.authorization;
+  // TEMP DEBUG: auth header visibility
+  // eslint-disable-next-line no-console
+  console.log("Authorization header", header);
   if (!header || !header.startsWith("Bearer ")) {
+    // eslint-disable-next-line no-console
+    console.log("401 reason", "Missing access token");
     return next(new AppError("Missing access token", 401));
   }
 
@@ -13,6 +18,8 @@ const authenticate = () => async (req, res, next) => {
 
   try {
     const payload = jwt.verify(token, env.jwtAccessSecret);
+    // eslint-disable-next-line no-console
+    console.log("Decoded user", payload);
     req.auth = {
       userId: payload.sub,
       email: payload.email,
@@ -21,6 +28,10 @@ const authenticate = () => async (req, res, next) => {
     };
     return next();
   } catch (error) {
+    // eslint-disable-next-line no-console
+    console.log("401 reason", "Invalid access token", {
+      message: error?.message,
+    });
     return next(new AppError("Invalid access token", 401));
   }
 };

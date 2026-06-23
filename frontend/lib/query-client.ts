@@ -23,6 +23,7 @@ const queryClient = new QueryClient({
 
 const queryKeys = {
   projects: ["projects"] as const,
+  project: (projectId: string | null | undefined) => ["project", projectId ?? "__active__"] as const,
   tasks: (projectId: string | null | undefined) => ["tasks", projectId ?? "__active__"] as const,
   task: (taskId: string) => ["task", taskId] as const,
 };

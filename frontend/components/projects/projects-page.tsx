@@ -296,7 +296,7 @@ function ProjectsPage() {
   }
 
   return (
-    <motion.main initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: "easeOut" }} className="space-y-6 px-4 py-6 md:px-8 md:py-8">
+    <motion.main initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: "easeOut" }} className="hidden-scrollbar space-y-6 px-4 py-6 md:px-8 md:py-8">
         <section className="space-y-3">
           <p className="text-sm uppercase tracking-[0.22em] text-violet-200/80">Project Management</p>
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">

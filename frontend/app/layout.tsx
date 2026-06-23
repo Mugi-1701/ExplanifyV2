@@ -16,9 +16,9 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className="h-full antialiased"
+      className="hidden-scrollbar h-full antialiased"
     >
-      <body className="min-h-full flex flex-col bg-[#050816] text-white">
+      <body className="hidden-scrollbar min-h-full flex flex-col bg-[#050816] text-white">
         <AppProviders>{children}</AppProviders>
       </body>
     </html>

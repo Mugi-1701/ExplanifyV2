@@ -31,12 +31,20 @@ const requireOrgMembershipIfQuery = () => (req, res, next) => {
 const loadProject = () => async (req, res, next) => {
   const projectId = req.params.projectId ?? req.params.id;
 
+  // TEMP DEBUG: project access gate
+  // eslint-disable-next-line no-console
+  console.log("Project", projectId);
+
   if (!projectId) {
+    // eslint-disable-next-line no-console
+    console.log("401 reason", "projectId is required");
     return next(new AppError("projectId is required", 400));
   }
 
   const project = await findProjectById(projectId);
   if (!project) {
+    // eslint-disable-next-line no-console
+    console.log("401 reason", "Project not found");
     return next(new AppError("Project not found", 404));
   }
 

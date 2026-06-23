@@ -22,7 +22,7 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
   const pathname = usePathname();
 
   return (
-    <div className="flex h-full flex-col gap-6 p-4">
+    <div className="hidden-scrollbar flex h-full flex-col gap-6 overflow-y-auto p-4">
       <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur-xl">
         <div className="flex items-center gap-3">
           <div className="flex size-10 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-blue-500 shadow-[0_0_30px_rgba(168,85,247,0.35)]">
@@ -108,7 +108,8 @@ function DashboardSidebar({ open, onClose }: DashboardSidebarProps) {
               className="absolute left-0 top-0 h-full w-[86%] max-w-sm border-r border-white/10 bg-[#070b1d]/95 shadow-2xl"
               onClick={(event) => event.stopPropagation()}
             >
-              <div className="flex items-center justify-between px-4 pt-4">
+              <div className="hidden-scrollbar flex h-full flex-col overflow-y-auto">
+                <div className="flex items-center justify-between px-4 pt-4">
                 <div className="flex items-center gap-2 text-sm text-white/70">
                   <PanelLeft className="size-4" />
                   Navigation
@@ -116,8 +117,9 @@ function DashboardSidebar({ open, onClose }: DashboardSidebarProps) {
                 <Button type="button" variant="ghost" size="icon-sm" onClick={onClose} className="border border-white/10 bg-white/5 text-white/75 hover:bg-white/10" aria-label="Close navigation menu">
                   <ChevronLeft className="size-4" />
                 </Button>
+                </div>
+                <SidebarContent onNavigate={onClose} />
               </div>
-              <SidebarContent onNavigate={onClose} />
             </motion.aside>
           </motion.div>
         ) : null}

@@ -5,6 +5,18 @@ const { computeCoordinationState, getTaskBlockingState } = require("./utils/getT
 const coordinationService = require("./coordination.service");
 const { recordEventSafely } = require("../events/service");
 
+function attachCalendarEvent(task) {
+  if (!task) {
+    return task;
+  }
+
+  const calendarEvent = Array.isArray(task.calendarEvents) ? task.calendarEvents[0] ?? null : task.calendarEvents ?? null;
+  return {
+    ...task,
+    calendarEvent,
+  };
+}
+
 /**
  * Recalculate blocked state for a single task and persist status changes
  */
@@ -48,9 +60,22 @@ async function createTask(orgId, userId, data) {
     );
   }
 
+  // TEMP DEBUG: selected skills before persistence.
+  // eslint-disable-next-line no-console
+  console.log("[tasks.create] selected skills before submit", data.requiredSkills ?? []);
+  // eslint-disable-next-line no-console
+  console.log("[tasks.create] receivedRequiredSkills", data.requiredSkills ?? []);
+  // eslint-disable-next-line no-console
+  console.log("[tasks.create] backend received payload", {
+    projectId: data.projectId,
+    title: data.title,
+    requiredSkills: data.requiredSkills ?? [],
+  });
+
   const created = await taskRepository.createTask({
     title: data.title,
     description: data.description,
+    requiredSkills: data.requiredSkills ?? [],
     status: data.status || "TODO",
     priority: data.priority || "MEDIUM",
     estimateHours: data.estimateHours,
@@ -137,13 +162,21 @@ async function createTask(orgId, userId, data) {
   // return enriched task
   const task = await taskRepository.getTaskById(created.id);
   const computed = computeCoordinationState(task);
-  return {
+  const result = attachCalendarEvent({
     ...task,
     isBlocked: computed.isBlocked,
     blockingTasks: computed.blockingTasks,
     coordinationReason: computed.coordinationReason,
     coordinationState: computed.coordinationState,
-  };
+  });
+
+  // TEMP DEBUG: verify DB saved value and API response value.
+  // eslint-disable-next-line no-console
+  console.log("[tasks.create] savedRequiredSkills", task?.requiredSkills ?? []);
+  // eslint-disable-next-line no-console
+  console.log("[tasks.create] returnedRequiredSkills", result?.requiredSkills ?? []);
+
+  return result;
 }
 
 /**
@@ -178,7 +211,14 @@ async function getTasksByProject(orgId, projectId, filters = {}) {
     };
   });
 
-  return enriched;
+  // TEMP DEBUG: verify GET task list response carries requiredSkills.
+  // eslint-disable-next-line no-console
+  console.log("[tasks.getByProject] returnedRequiredSkills", enriched.map((task) => ({
+    taskId: task.id,
+    requiredSkills: task.requiredSkills ?? [],
+  })));
+
+  return enriched.map(attachCalendarEvent);
 }
 
 /**
@@ -196,13 +236,22 @@ async function getTaskById(taskId) {
   }
 
   const computed = computeCoordinationState(task);
-  return {
+  const result = attachCalendarEvent({
     ...task,
     isBlocked: computed.isBlocked,
     blockingTasks: computed.blockingTasks,
     coordinationReason: computed.coordinationReason,
     coordinationState: computed.coordinationState,
-  };
+  });
+
+  // TEMP DEBUG: verify GET single task response carries requiredSkills.
+  // eslint-disable-next-line no-console
+  console.log("[tasks.getById] returnedRequiredSkills", {
+    taskId: result.id,
+    requiredSkills: result.requiredSkills ?? [],
+  });
+
+  return result;
 }
 
 /**
@@ -218,6 +267,17 @@ async function updateTask(taskId, data, userId) {
   if (!existingTask) {
     throw new AppError("Task not found", 404);
   }
+
+  // TEMP DEBUG: selected skills before persistence.
+  // eslint-disable-next-line no-console
+  console.log("[tasks.update] selected skills before submit", data.requiredSkills ?? []);
+  // eslint-disable-next-line no-console
+  console.log("[tasks.update] receivedRequiredSkills", data.requiredSkills ?? []);
+  // eslint-disable-next-line no-console
+  console.log("[tasks.update] backend received payload", {
+    taskId,
+    requiredSkills: data.requiredSkills ?? [],
+  });
 
   const updatedTask = await taskRepository.updateTask(taskId, data);
 
@@ -343,14 +403,22 @@ async function updateTask(taskId, data, userId) {
     coordinationSuggestions = await coordinationService.findCoordinationSuggestions(taskId);
   }
 
-  return {
+  const result = attachCalendarEvent({
     ...refreshed,
     isBlocked: computed.isBlocked,
     blockingTasks: computed.blockingTasks,
     coordinationReason: computed.coordinationReason,
     coordinationState: computed.coordinationState,
     coordinationSuggestions,
-  };
+  });
+
+  // TEMP DEBUG: verify DB saved value and API response value.
+  // eslint-disable-next-line no-console
+  console.log("[tasks.update] savedRequiredSkills", refreshed?.requiredSkills ?? []);
+  // eslint-disable-next-line no-console
+  console.log("[tasks.update] returnedRequiredSkills", result?.requiredSkills ?? []);
+
+  return result;
 }
 
 /**
@@ -389,6 +457,74 @@ async function deleteTask(taskId) {
   }
 
   return deletedTask;
+}
+
+async function scheduleTask(taskId, userId, data) {
+  if (!taskId) {
+    throw new AppError("Task ID is required", 400);
+  }
+
+  const task = await taskRepository.getTaskById(taskId);
+  if (!task) {
+    throw new AppError("Task not found", 404);
+  }
+
+  if (task.createdById !== userId && task.assigneeId !== userId) {
+    throw new AppError("You can only schedule tasks you own or are assigned to", 403);
+  }
+
+  const project = await prisma.project.findFirst({
+    where: {
+      id: task.projectId,
+      orgId: task.organizationId,
+    },
+    select: {
+      id: true,
+      ownerId: true,
+      members: {
+        select: {
+          userId: true,
+        },
+      },
+    },
+  });
+
+  if (!project) {
+    throw new AppError("You do not have access to this task's project", 403);
+  }
+
+  const isProjectOwner = project.ownerId === userId;
+  const isProjectMember = project.members.some((member) => member.userId === userId);
+  if (!isProjectOwner && !isProjectMember && task.createdById !== userId && task.assigneeId !== userId) {
+    throw new AppError("You can only schedule tasks you own or are assigned to", 403);
+  }
+
+  const startTime = new Date(data.date);
+  const [hours, minutes] = data.startTime.split(":").map((value) => Number(value));
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+    throw new AppError("startTime must be HH:mm", 400);
+  }
+  startTime.setHours(hours, minutes, 0, 0);
+  const endTime = new Date(startTime.getTime() + data.durationMinutes * 60_000);
+
+  const createdEvent = await taskRepository.createCalendarEvent({
+    title: data.title?.trim() || task.title,
+    description: data.description ?? task.description ?? null,
+    startTime,
+    endTime,
+    taskId: task.id,
+    userId,
+  });
+
+  const refreshedTask = await taskRepository.getTaskById(task.id);
+
+  return {
+    task: {
+      ...refreshedTask,
+      calendarEvent: createdEvent,
+    },
+    calendarEvent: createdEvent,
+  };
 }
 
 /**
@@ -528,6 +664,7 @@ module.exports = {
   getTaskById,
   updateTask,
   deleteTask,
+  scheduleTask,
   addDependency,
   removeDependency,
   getDependencyGraph,

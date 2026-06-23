@@ -6,11 +6,12 @@ type ProjectStatsProps = {
 };
 
 function ProjectStats({ projects }: ProjectStatsProps) {
-  const activeProject = projects.find((project) => project.isActive);
-  const totalProjects = projects.length;
-  const totalTasks = projects.reduce((sum, project) => sum + project.stats.taskCount, 0);
-  const blockedTasks = projects.reduce((sum, project) => sum + project.stats.blockedTaskCount, 0);
-  const completedTasks = projects.reduce((sum, project) => sum + project.stats.completedTaskCount, 0);
+  const safeProjects = Array.isArray(projects) ? projects : [];
+  const activeProject = safeProjects.find((project) => project.isActive) ?? safeProjects[0] ?? null;
+  const totalProjects = safeProjects.length;
+  const totalTasks = safeProjects.reduce((sum, project) => sum + (project.stats?.taskCount ?? 0), 0);
+  const blockedTasks = safeProjects.reduce((sum, project) => sum + (project.stats?.blockedTaskCount ?? 0), 0);
+  const completedTasks = safeProjects.reduce((sum, project) => sum + (project.stats?.completedTaskCount ?? 0), 0);
 
   const stats = [
     { label: "Total Projects", value: String(totalProjects), tone: "violet" },
@@ -38,11 +39,11 @@ function ProjectStats({ projects }: ProjectStatsProps) {
               {activeProject?.name ?? "No active project selected"}
             </p>
             <p className="mt-1 text-sm text-white/50">
-              {activeProject?.stats.coordinationReason ?? "Select a project to sync the dashboard and tasks views."}
+              {activeProject?.stats?.coordinationReason ?? "Select a project to sync the dashboard and tasks views."}
             </p>
           </div>
           <div className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/70">
-            {activeProject ? `${activeProject.stats.taskCount} live tasks` : "Awaiting selection"}
+            {activeProject ? `${activeProject.stats?.taskCount ?? 0} live tasks` : "Awaiting selection"}
           </div>
         </CardContent>
       </Card>

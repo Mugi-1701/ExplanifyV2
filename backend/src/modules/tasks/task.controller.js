@@ -6,8 +6,15 @@ const resolveActiveOrgId = (req) =>
 async function createTask(req, res, next) {
   try {
     const orgId = resolveActiveOrgId(req);
+    // TEMP DEBUG: controller-level access context
+    // eslint-disable-next-line no-console
+    console.log("Organization", orgId);
+    // eslint-disable-next-line no-console
+    console.log("Project", req.projectId ?? null);
 
     if (!orgId) {
+      // eslint-disable-next-line no-console
+      console.log("401 reason", "No active organization found in token");
       return res.status(401).json({
         status: "error",
         message: "No active organization found in token",
@@ -84,6 +91,15 @@ async function deleteTask(req, res, next) {
   }
 }
 
+async function scheduleTask(req, res, next) {
+  try {
+    const result = await taskService.scheduleTask(req.params.taskId, req.auth?.userId, req.body);
+    return res.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function addDependency(req, res, next) {
   try {
     const taskId = req.body.taskId;
@@ -153,6 +169,7 @@ module.exports = {
   getTaskById,
   updateTask,
   deleteTask,
+  scheduleTask,
   addDependency,
   getDependencies,
   removeDependency,

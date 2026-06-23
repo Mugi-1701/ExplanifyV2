@@ -11,6 +11,7 @@ const aiRoutes = require("../modules/ai/routes");
 const aiExplanationsRoutes = require("../modules/ai-explanations/routes");
 const notificationsRoutes = require("../modules/notifications/routes");
 const eventsRoutes = require("../modules/events/routes");
+const calendarRoutes = require("../modules/calendar/calendar.routes");
 
 const router = express.Router();
 
@@ -30,5 +31,6 @@ router.use("/", aiRoutes);
 router.use("/ai-explanations", aiExplanationsRoutes);
 router.use("/notifications", notificationsRoutes);
 router.use("/events", eventsRoutes);
+router.use("/calendar/events", calendarRoutes);
 
 module.exports = router;

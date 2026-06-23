@@ -23,6 +23,7 @@ function TaskCreateForm({ projectId, tasks = [], onCreate }: TaskCreateFormProps
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<CreateTaskInput["priority"]>("MEDIUM");
   const [dependsOnTaskId, setDependsOnTaskId] = useState<string | null>(null);
+  const [requiredSkills, setRequiredSkills] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const resolvedProjectId = projectId ?? resolveProjectId();
@@ -43,11 +44,13 @@ function TaskCreateForm({ projectId, tasks = [], onCreate }: TaskCreateFormProps
         projectId: resolvedProjectId ?? "",
         status: "TODO",
         dependsOnTaskId: dependsOnTaskId || undefined,
+        requiredSkills,
       });
       setTitle("");
       setDescription("");
       setPriority("MEDIUM");
       setDependsOnTaskId(null);
+      setRequiredSkills([]);
     } catch (createError) {
       setError(getApiErrorMessage(createError, "Unable to create task."));
     } finally {
@@ -76,6 +79,21 @@ function TaskCreateForm({ projectId, tasks = [], onCreate }: TaskCreateFormProps
                 {level}
               </button>
             ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {(["Frontend", "Backend", "AI/ML", "UI/UX", "Testing", "DevOps"] as const).map((skill) => {
+              const selected = requiredSkills.includes(skill);
+              return (
+                <button
+                  key={skill}
+                  type="button"
+                  onClick={() => setRequiredSkills((current) => (selected ? current.filter((item) => item !== skill) : [...current, skill]))}
+                  className={`rounded-full border px-3 py-2 text-xs font-medium transition ${selected ? "border-violet-400/30 bg-violet-500/15 text-violet-100" : "border-white/10 bg-white/5 text-white/55 hover:bg-white/10"}`}
+                >
+                  {skill}
+                </button>
+              );
+            })}
           </div>
           {resolvedProjectId && (
             <DependencySelect

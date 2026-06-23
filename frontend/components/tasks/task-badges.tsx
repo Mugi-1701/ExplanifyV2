@@ -13,6 +13,7 @@ function TaskBadges({ task }: TaskBadgesProps) {
       <Badge variant="default" className={cn(getStatusTone(task.status), "capitalize")}>{task.status.replaceAll("_", " ")}</Badge>
       <Badge variant="default" className={getPriorityTone(task.priority)}>{task.priority ?? "MEDIUM"}</Badge>
       {task.isBlocked ? <Badge variant="warning">Blocked</Badge> : <Badge variant="success">Ready</Badge>}
+      {task.calendarEvent ? <Badge variant="blue">Scheduled</Badge> : null}
     </div>
   );
 }

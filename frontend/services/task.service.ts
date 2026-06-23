@@ -1,6 +1,6 @@
 import { api } from "@/lib/api";
 import { ACTIVE_PROJECT_KEY, readStoredValue } from "@/lib/storage";
-import type { CreateTaskInput, Task, TasksResponse, UpdateTaskInput } from "@/types/task";
+import type { CreateTaskInput, ScheduleTaskInput, Task, TasksResponse, UpdateTaskInput } from "@/types/task";
 
 function unwrapTaskResponse(responseData: unknown): Task[] {
   if (Array.isArray(responseData)) {
@@ -77,6 +77,10 @@ async function createTask(input: CreateTaskInput): Promise<Task> {
     priority: normalizePriority(input.priority),
   };
 
+  // TEMP DEBUG: task create request payload.
+  // eslint-disable-next-line no-console
+  console.log("[tasks.create] request payload", payload);
+
   const { data } = await api.post<Task>("/tasks", payload);
   const [task] = unwrapTaskResponse(data);
   return task ?? data;
@@ -92,6 +96,10 @@ async function updateTask(taskId: string, input: UpdateTaskInput): Promise<Task>
     priority: normalizePriority(input.priority),
   };
 
+  // TEMP DEBUG: task update request payload.
+  // eslint-disable-next-line no-console
+  console.log("[tasks.update] request payload", payload);
+
   const { data } = await api.patch<Task>(`/tasks/${taskId}`, payload);
   const [task] = unwrapTaskResponse(data);
   return task ?? data;
@@ -105,4 +113,18 @@ async function deleteTask(taskId: string): Promise<void> {
   await api.delete(`/tasks/${taskId}`);
 }
 
-export { createTask, deleteTask, getTasks, getTaskById, resolveProjectId, updateTask };
+async function scheduleTask(taskId: string, input: ScheduleTaskInput): Promise<{ task: Task; calendarEvent: NonNullable<Task["calendarEvent"]> }> {
+  if (!taskId) {
+    throw new Error("taskId is required");
+  }
+
+  const { data } = await api.post(`/tasks/${taskId}/schedule`, input);
+  const payload = data && typeof data === "object" && "task" in data ? (data as { task?: Task; calendarEvent?: NonNullable<Task["calendarEvent"]> }) : null;
+  if (!payload?.task || !payload.calendarEvent) {
+    throw new Error("Failed to schedule task");
+  }
+
+  return { task: payload.task, calendarEvent: payload.calendarEvent };
+}
+
+export { createTask, deleteTask, getTasks, getTaskById, resolveProjectId, scheduleTask, updateTask };
