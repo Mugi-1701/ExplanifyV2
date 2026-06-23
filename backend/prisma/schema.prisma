@@ -1,15 +1,353 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
   engineType = "binary"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+model User {
+  id                 String               @id @default(uuid())
+  email              String               @unique
+  name               String
+  avatarUrl          String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  lastLoginAt        DateTime?
+  passwordHash       String
+  eventLogs          EventLog[]           @relation("EventLogActor")
+  memberships        Membership[]
+  notifications      Notification[]       @relation("NotificationRecipient")
+  invites            OrganizationInvite[]
+  ownedProjects      Project[]
+  activities         ProjectActivity[]    @relation("ActivityActor")
+  projectMembers     ProjectMember[]
+  refreshTokens      RefreshToken[]
+  aiRecommendedTasks Task[]               @relation("TaskAIRecommendation")
+  assignedTasks      Task[]               @relation("TaskAssignee")
+  createdTasks       Task[]               @relation("TaskCreator")
+  calendarEvents     CalendarEvent[]
+  teamMemberships    TeamMember[]
+}
+
+model Organization {
+  id            String               @id @default(uuid())
+  name          String
+  slug          String               @unique
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  aiOutputs     AIExplanation[]
+  events        EventLog[]
+  memberships   Membership[]
+  notifications Notification[]
+  invites       OrganizationInvite[]
+  projects      Project[]
+  activities    ProjectActivity[]
+  tasks         Task[]
+  teams         Team[]
+  roles         WorkspaceRole[]
+  skills        WorkspaceSkill[]
+}
+
+model Membership {
+  id           String       @id @default(uuid())
+  orgId        String
+  userId       String
+  role         OrgRole      @default(MEMBER)
+  createdAt    DateTime     @default(now())
+  organization Organization @relation(fields: [orgId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@unique([orgId, userId])
+  @@index([orgId, role])
+  @@index([userId])
+}
+
+model OrganizationInvite {
+  id           String                   @id @default(uuid())
+  orgId        String
+  email        String
+  role         OrgRole                  @default(MEMBER)
+  status       OrganizationInviteStatus @default(PENDING)
+  tokenHash    String
+  inviterId    String
+  expiresAt    DateTime
+  acceptedAt   DateTime?
+  createdAt    DateTime                 @default(now())
+  inviter      User                     @relation(fields: [inviterId], references: [id])
+  organization Organization             @relation(fields: [orgId], references: [id])
+
+  @@unique([orgId, email])
+  @@index([orgId, status])
+  @@index([email])
+}
+
+model Team {
+  id           String       @id @default(uuid())
+  orgId        String
+  name         String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  projects     Project[]
+  organization Organization @relation(fields: [orgId], references: [id])
+  members      TeamMember[]
+
+  @@index([orgId])
+}
+
+model TeamMember {
+  id        String   @id @default(uuid())
+  teamId    String
+  userId    String
+  role      TeamRole @default(MEMBER)
+  createdAt DateTime @default(now())
+  team      Team     @relation(fields: [teamId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([teamId, userId])
+  @@index([teamId, role])
+}
+
+model Project {
+  id           String            @id @default(uuid())
+  orgId        String
+  teamId       String?
+  name         String
+  description  String?
+  status       ProjectStatus     @default(ACTIVE)
+  startDate    DateTime?
+  dueDate      DateTime?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  ownerId      String
+  slug         String?
+  aiOutputs    AIExplanation[]
+  events       EventLog[]
+  organization Organization      @relation(fields: [orgId], references: [id])
+  owner        User              @relation(fields: [ownerId], references: [id])
+  team         Team?             @relation(fields: [teamId], references: [id])
+  activities   ProjectActivity[]
+  members      ProjectMember[]
+  tasks        Task[]
+
+  @@index([orgId, status])
+  @@index([ownerId])
+  @@index([teamId])
+}
+
+model ProjectMember {
+  id           String         @id @default(uuid())
+  projectId    String
+  userId       String
+  role         ProjectRole    @default(MEMBER)
+  createdAt    DateTime       @default(now())
+  skills       String[]       @default([])
+  roleId       String?
+  memberSkills MemberSkill[]
+  project      Project        @relation(fields: [projectId], references: [id])
+  roleRef      WorkspaceRole? @relation(fields: [roleId], references: [id])
+  user         User           @relation(fields: [userId], references: [id])
+
+  @@unique([projectId, userId])
+  @@index([projectId, role])
+  @@index([roleId])
+}
+
+model WorkspaceRole {
+  id             String          @id @default(uuid())
+  workspaceId    String
+  name           String
+  permissions    Json            @default("{}")
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  projectMembers ProjectMember[]
+  workspace      Organization    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+}
+
+model WorkspaceSkill {
+  id           String        @id @default(uuid())
+  workspaceId  String
+  name         String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  memberSkills MemberSkill[]
+  workspace    Organization  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+}
+
+model MemberSkill {
+  id        String         @id @default(uuid())
+  memberId  String
+  skillId   String
+  createdAt DateTime       @default(now())
+  member    ProjectMember  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  skill     WorkspaceSkill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, skillId])
+  @@index([skillId])
+}
+
+model Task {
+  id                          String            @id @default(uuid())
+  projectId                   String
+  title                       String
+  description                 String?
+  requiredSkills              String[]          @default([])
+  status                      TaskStatus        @default(TODO)
+  priority                    TaskPriority      @default(MEDIUM)
+  assigneeId                  String?
+  estimateHours               Float?
+  dueDate                     DateTime?
+  createdAt                   DateTime          @default(now())
+  updatedAt                   DateTime          @updatedAt
+  createdById                 String
+  organizationId              String
+  startDate                   DateTime?
+  aiRecommendedUserId         String?
+  aiRecommendationScore       Float?
+  aiRecommendationConfidence  AIConfidence?
+  aiRecommendationExplanation Json?
+  aiOutputs                   AIExplanation[]
+  activities                  ProjectActivity[] @relation("TaskActivity")
+  aiRecommendedUser           User?             @relation("TaskAIRecommendation", fields: [aiRecommendedUserId], references: [id])
+  assignee                    User?             @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  creator                     User              @relation("TaskCreator", fields: [createdById], references: [id])
+  organization                Organization      @relation(fields: [organizationId], references: [id])
+  project                     Project           @relation(fields: [projectId], references: [id])
+  dependents                  TaskDependency[]  @relation("TaskDependents")
+  dependencies                TaskDependency[]  @relation("TaskDependencies")
+  calendarEvents              CalendarEvent[]
+
+  @@index([organizationId, projectId])
+  @@index([projectId, status])
+  @@index([assigneeId, status])
+}
+
+model TaskDependency {
+  id              String   @id @default(uuid())
+  createdAt       DateTime @default(now())
+  dependsOnTaskId String
+  taskId          String
+  dependsOnTask   Task     @relation("TaskDependents", fields: [dependsOnTaskId], references: [id], onDelete: Cascade)
+  task            Task     @relation("TaskDependencies", fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, dependsOnTaskId])
+  @@index([dependsOnTaskId])
+}
+
+model AIExplanation {
+  id           String       @id @default(uuid())
+  orgId        String
+  projectId    String?
+  taskId       String?
+  targetType   AITargetType
+  summary      String
+  rationale    String
+  evidence     Json
+  confidence   AIConfidence
+  actions      Json?
+  eventId      String?
+  createdAt    DateTime     @default(now())
+  event        EventLog?    @relation("EventLogAIOutputs", fields: [eventId], references: [id])
+  organization Organization @relation(fields: [orgId], references: [id])
+  project      Project?     @relation(fields: [projectId], references: [id])
+  task         Task?        @relation(fields: [taskId], references: [id])
+
+  @@index([orgId, targetType])
+  @@index([projectId])
+  @@index([taskId])
+}
+
+model ProjectActivity {
+  id           String       @id @default(uuid())
+  orgId        String
+  projectId    String
+  taskId       String?
+  actorId      String?
+  type         ActivityType
+  payload      Json
+  createdAt    DateTime     @default(now())
+  actor        User?        @relation("ActivityActor", fields: [actorId], references: [id])
+  organization Organization @relation(fields: [orgId], references: [id])
+  project      Project      @relation(fields: [projectId], references: [id])
+  task         Task?        @relation("TaskActivity", fields: [taskId], references: [id])
+
+  @@index([orgId, createdAt])
+  @@index([projectId, createdAt])
+}
+
+model Notification {
+  id           String           @id @default(uuid())
+  orgId        String
+  userId       String
+  type         NotificationType
+  payload      Json
+  readAt       DateTime?
+  createdAt    DateTime         @default(now())
+  organization Organization     @relation(fields: [orgId], references: [id])
+  recipient    User             @relation("NotificationRecipient", fields: [userId], references: [id])
+
+  @@index([orgId, createdAt])
+  @@index([userId, readAt])
+}
+
+model EventLog {
+  id             String          @id @default(uuid())
+  entityType     String
+  entityId       String
+  eventType      EventType
+  createdAt      DateTime        @default(now())
+  organizationId String
+  projectId      String?
+  userId         String?
+  metadata       Json            @default("{}")
+  aiOutputs      AIExplanation[] @relation("EventLogAIOutputs")
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  project        Project?        @relation(fields: [projectId], references: [id])
+  user           User?           @relation("EventLogActor", fields: [userId], references: [id])
+
+  @@index([organizationId, createdAt])
+  @@index([projectId, createdAt])
+  @@index([entityType, entityId])
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@index([userId, expiresAt])
+}
+
+model CalendarEvent {
+  id          String  @id @default(cuid())
+  title       String
+  description String?
+
+  startTime DateTime
+  endTime   DateTime
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  taskId String?
+  task   Task?   @relation(fields: [taskId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, startTime])
+  @@index([taskId])
 }
 
 enum OrgRole {
@@ -86,16 +424,12 @@ enum ActivityType {
 enum EventType {
   PROJECT_CREATED
   PROJECT_UPDATED
-
   TASK_CREATED
   TASK_UPDATED
   TASK_COMPLETED
   TASK_ASSIGNED
-  TASK_DELETED
-
   MEMBER_ADDED
   MEMBER_REMOVED
-
   DEPENDENCY_CREATED
   DEPENDENCY_REMOVED
 }
@@ -110,346 +444,4 @@ enum AIConfidence {
   LOW
   MEDIUM
   HIGH
-}
-
-model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  name      String
-  passwordHash String
-  avatarUrl String?
-  lastLoginAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  memberships     Membership[]
-  teamMemberships TeamMember[]
-  projectMembers  ProjectMember[]
-  assignedTasks   Task[]            @relation("TaskAssignee")
-  aiRecommendedTasks Task[]         @relation("TaskAIRecommendation")
-  createdTasks    Task[]            @relation("TaskCreator")
-  activities      ProjectActivity[] @relation("ActivityActor")
-  notifications   Notification[]    @relation("NotificationRecipient")
-  eventLogs       EventLog[]        @relation("EventLogActor")
-  refreshTokens   RefreshToken[]
-  invites         OrganizationInvite[]
-  ownedProjects   Project[]
-}
-
-model Organization {
-  id        String   @id @default(uuid())
-  name      String
-  slug      String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  memberships   Membership[]
-  teams         Team[]
-  projects      Project[]
-  roles         WorkspaceRole[]
-  skills        WorkspaceSkill[]
-  tasks         Task[]
-  activities    ProjectActivity[]
-  events        EventLog[]
-  aiOutputs     AIExplanation[]
-  notifications Notification[]
-  invites       OrganizationInvite[]
-}
-
-model Membership {
-  id        String   @id @default(uuid())
-  orgId     String
-  userId    String
-  role      OrgRole  @default(MEMBER)
-  createdAt DateTime @default(now())
-
-  organization Organization @relation(fields: [orgId], references: [id])
-  user         User         @relation(fields: [userId], references: [id])
-
-  @@unique([orgId, userId])
-  @@index([orgId, role])
-  @@index([userId])
-}
-
-model OrganizationInvite {
-  id         String                   @id @default(uuid())
-  orgId      String
-  email      String
-  role       OrgRole                  @default(MEMBER)
-  status     OrganizationInviteStatus @default(PENDING)
-  tokenHash  String
-  inviterId  String
-  expiresAt  DateTime
-  acceptedAt DateTime?
-  createdAt  DateTime                 @default(now())
-
-  organization Organization @relation(fields: [orgId], references: [id])
-  inviter      User         @relation(fields: [inviterId], references: [id])
-
-  @@unique([orgId, email])
-  @@index([orgId, status])
-  @@index([email])
-}
-
-model Team {
-  id        String   @id @default(uuid())
-  orgId     String
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  organization Organization @relation(fields: [orgId], references: [id])
-  members      TeamMember[]
-  projects     Project[]
-
-  @@index([orgId])
-}
-
-model TeamMember {
-  id        String   @id @default(uuid())
-  teamId    String
-  userId    String
-  role      TeamRole @default(MEMBER)
-  createdAt DateTime @default(now())
-
-  team Team @relation(fields: [teamId], references: [id])
-  user User @relation(fields: [userId], references: [id])
-
-  @@unique([teamId, userId])
-  @@index([teamId, role])
-}
-
-model Project {
-  id          String        @id @default(uuid())
-  orgId       String
-  ownerId     String
-  teamId      String?
-  name        String
-  slug        String?
-  description String?
-  status      ProjectStatus @default(ACTIVE)
-  startDate   DateTime?
-  dueDate     DateTime?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-
-  organization Organization      @relation(fields: [orgId], references: [id])
-  owner        User              @relation(fields: [ownerId], references: [id])
-  team         Team?             @relation(fields: [teamId], references: [id])
-  teamCode     String?           @unique
-  members      ProjectMember[]
-  tasks        Task[]
-  activities   ProjectActivity[]
-  events       EventLog[]
-  aiOutputs    AIExplanation[]
-
-  @@index([orgId, status])
-  @@index([ownerId])
-  @@index([teamId])
-}
-
-model ProjectMember {
-  id        String      @id @default(uuid())
-  projectId String
-  userId    String
-  roleId    String?
-  role      String      @default("Member")
-  skills    String[]    @default([])
-  createdAt DateTime    @default(now())
-
-  project Project @relation(fields: [projectId], references: [id])
-  user    User    @relation(fields: [userId], references: [id])
-  roleRef WorkspaceRole? @relation(fields: [roleId], references: [id])
-  memberSkills MemberSkill[]
-
-  @@unique([projectId, userId])
-  @@index([projectId, role])
-  @@index([roleId])
-}
-
-model WorkspaceRole {
-  id          String   @id @default(uuid())
-  workspaceId String
-  name        String
-  permissions Json     @default("{}")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  workspace   Organization   @relation(fields: [workspaceId], references: [id])
-  projectMembers ProjectMember[]
-
-  @@unique([workspaceId, name])
-  @@index([workspaceId])
-}
-
-model WorkspaceSkill {
-  id          String   @id @default(uuid())
-  workspaceId String
-  name        String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  workspace   Organization   @relation(fields: [workspaceId], references: [id])
-  memberSkills MemberSkill[]
-
-  @@unique([workspaceId, name])
-  @@index([workspaceId])
-}
-
-model MemberSkill {
-  id       String   @id @default(uuid())
-  memberId String
-  skillId  String
-  createdAt DateTime @default(now())
-
-  member ProjectMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  skill  WorkspaceSkill @relation(fields: [skillId], references: [id], onDelete: Cascade)
-
-  @@unique([memberId, skillId])
-  @@index([skillId])
-}
-
-model Task {
-  id             String       @id @default(uuid())
-  organizationId String
-  projectId      String
-  title          String
-  description    String?
-  status         TaskStatus   @default(TODO)
-  priority       TaskPriority @default(MEDIUM)
-  assigneeId     String?
-  aiRecommendedUserId String?
-  aiRecommendationScore Float?
-  aiRecommendationConfidence AIConfidence?
-  aiRecommendationExplanation Json?
-  createdById    String
-  estimateHours  Float?
-  startDate      DateTime?
-  dueDate        DateTime?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-
-  organization Organization      @relation(fields: [organizationId], references: [id])
-  project      Project           @relation(fields: [projectId], references: [id])
-  assignee     User?             @relation("TaskAssignee", fields: [assigneeId], references: [id])
-  aiRecommendedUser User?        @relation("TaskAIRecommendation", fields: [aiRecommendedUserId], references: [id])
-  creator      User              @relation("TaskCreator", fields: [createdById], references: [id])
-  dependencies TaskDependency[]  @relation("TaskDependencies")
-  dependents   TaskDependency[]  @relation("TaskDependents")
-  aiOutputs    AIExplanation[]
-  activities   ProjectActivity[] @relation("TaskActivity")
-
-  @@index([organizationId, projectId])
-  @@index([projectId, status])
-  @@index([assigneeId, status])
-}
-
-model TaskDependency {
-  id              String   @id @default(uuid())
-  taskId          String
-  dependsOnTaskId String
-  createdAt       DateTime @default(now())
-
-  // task depends on dependsOnTask
-  task            Task @relation("TaskDependencies", fields: [taskId], references: [id], onDelete: Cascade)
-  dependsOnTask   Task @relation("TaskDependents", fields: [dependsOnTaskId], references: [id], onDelete: Cascade)
-
-  @@unique([taskId, dependsOnTaskId])
-  @@index([dependsOnTaskId])
-}
-
-model AIExplanation {
-  id         String       @id @default(uuid())
-  orgId      String
-  projectId  String?
-  taskId     String?
-  targetType AITargetType
-  summary    String
-  rationale  String
-  evidence   Json
-  confidence AIConfidence
-  actions    Json?
-  eventId    String?
-  createdAt  DateTime     @default(now())
-
-  organization Organization @relation(fields: [orgId], references: [id])
-  project      Project?     @relation(fields: [projectId], references: [id])
-  task         Task?        @relation(fields: [taskId], references: [id])
-  // Explanation traceability back to the originating event
-  event        EventLog?    @relation("EventLogAIOutputs", fields: [eventId], references: [id])
-
-  @@index([orgId, targetType])
-  @@index([projectId])
-  @@index([taskId])
-}
-
-model ProjectActivity {
-  id        String       @id @default(uuid())
-  orgId     String
-  projectId String
-  taskId    String?
-  actorId   String?
-  type      ActivityType
-  payload   Json
-  createdAt DateTime     @default(now())
-
-  organization Organization @relation(fields: [orgId], references: [id])
-  project      Project      @relation(fields: [projectId], references: [id])
-  // Optional task context for activity events
-  task         Task?        @relation("TaskActivity", fields: [taskId], references: [id])
-  actor        User?        @relation("ActivityActor", fields: [actorId], references: [id])
-
-  @@index([orgId, createdAt])
-  @@index([projectId, createdAt])
-}
-
-model Notification {
-  id        String           @id @default(uuid())
-  orgId     String
-  userId    String
-  type      NotificationType
-  payload   Json
-  readAt    DateTime?
-  createdAt DateTime         @default(now())
-
-  organization Organization @relation(fields: [orgId], references: [id])
-  recipient    User         @relation("NotificationRecipient", fields: [userId], references: [id])
-
-  @@index([orgId, createdAt])
-  @@index([userId, readAt])
-}
-
-model EventLog {
-  id         String   @id @default(uuid())
-  organizationId String
-  projectId  String?
-  userId     String?
-  eventType  EventType
-  entityType String
-  entityId   String
-  metadata   Json
-  createdAt  DateTime @default(now())
-
-  organization Organization    @relation(fields: [organizationId], references: [id])
-  user        User?            @relation("EventLogActor", fields: [userId], references: [id])
-  project     Project?         @relation(fields: [projectId], references: [id])
-  // AI explanations generated from this event
-  aiOutputs    AIExplanation[] @relation("EventLogAIOutputs")
-
-  @@index([organizationId, createdAt])
-  @@index([projectId, createdAt])
-  @@index([entityType, entityId])
-}
-
-model RefreshToken {
-  id        String   @id @default(uuid())
-  userId    String
-  tokenHash String
-  expiresAt DateTime
-  revokedAt DateTime?
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id])
-
-  @@index([userId, expiresAt])
 }
