@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
-import { canShowDeleteButtons } from "@/lib/rbac";
+import { canShowDeleteTask } from "@/lib/rbac";
 import { useRole } from "@/hooks/useRole";
 import type { CreateTaskInput, Task } from "@/types/task";
 import { TaskBadges } from "./task-badges";
@@ -24,7 +24,7 @@ type TaskCardProps = {
 
 function TaskCard({ task, onUpdateStatus, onUpdatePriority, onDelete, onEdit, onSelectTask }: TaskCardProps) {
   const role = useRole();
-  const showDelete = canShowDeleteButtons(role);
+  const showDelete = canShowDeleteTask(role);
   const dependencyNodes = getTaskDependencyNodes(task);
   const dependencyCount = dependencyNodes.length;
   const formattedUpdatedAt = task.updatedAt

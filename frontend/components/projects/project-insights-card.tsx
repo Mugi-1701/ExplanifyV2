@@ -4,7 +4,7 @@ import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ActivityTimeline } from "@/components/events";
-import { canShowDeleteProject, canShowManageMembers, canShowRoleManagement } from "@/lib/rbac";
+import { canShowDeleteProject, canShowManageMembers } from "@/lib/rbac";
 import { useRole } from "@/hooks/useRole";
 import type { ProjectMember, ProjectWithStats } from "@/types/project";
 import { formatProjectDate, getCoordinationTone } from "./project-utils";
@@ -25,7 +25,7 @@ type ProjectInsightsCardProps = {
 function ProjectInsightsCard({ project, activeTab, onTabChange, onAddMember, onEditMember, onRemoveMember, onEditProject, onArchiveProject, onDeleteProject, onChangeLead }: ProjectInsightsCardProps) {
   const role = useRole();
   const allowManageMembers = canShowManageMembers(role);
-  const allowRoleManagement = canShowRoleManagement(role);
+  const allowRoleManagement = canShowManageMembers(role);
   const allowDeleteProject = canShowDeleteProject(role);
   if (!project) {
     return (

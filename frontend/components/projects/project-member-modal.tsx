@@ -7,7 +7,7 @@ import { Check, ChevronDown, Pencil, Plus, Search, Trash2, X } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { getApiErrorMessage } from "@/lib/api-errors";
-import { canShowManageMembers, canShowRoleManagement } from "@/lib/rbac";
+import { canShowManageMembers } from "@/lib/rbac";
 import { useRole } from "@/hooks/useRole";
 import { useToast } from "@/components/ui/toast";
 import type { AddProjectMemberInput, ProjectMember } from "@/types/project";
@@ -34,7 +34,7 @@ function ProjectMemberModal({ open, users, mode, member, onClose, onSubmit }: Pr
   const { toast } = useToast();
   const role = useRole();
   const allowMemberManagement = canShowManageMembers(role);
-  const allowRoleManagement = canShowRoleManagement(role);
+  const allowRoleManagement = canShowManageMembers(role);
   const [roles, setRoles] = useState<WorkspaceRole[]>([]);
   const [skills, setSkills] = useState<WorkspaceSkill[]>([]);
   const [values, setValues] = useState<FormState>({ userId: "", roleId: "", skillIds: [] });

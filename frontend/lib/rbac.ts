@@ -11,12 +11,17 @@ export type OrganizationRole = (typeof ORGANIZATION_ROLES)[keyof typeof ORGANIZA
 
 export const PERMISSIONS = {
   CREATE_PROJECT: "CREATE_PROJECT",
+  UPDATE_PROJECT: "UPDATE_PROJECT",
   DELETE_PROJECT: "DELETE_PROJECT",
-  MANAGE_MEMBERS: "MANAGE_MEMBERS",
-  ROLE_MANAGEMENT: "ROLE_MANAGEMENT",
-  CREATE_TASK: "CREATE_TASK",
   DELETE_ORGANIZATION: "DELETE_ORGANIZATION",
-  DELETE_BUTTONS: "DELETE_BUTTONS",
+  MANAGE_MEMBERS: "MANAGE_MEMBERS",
+  CREATE_TASK: "CREATE_TASK",
+  UPDATE_TASK: "UPDATE_TASK",
+  DELETE_TASK: "DELETE_TASK",
+  ASSIGN_TASK: "ASSIGN_TASK",
+  VIEW_PROJECT: "VIEW_PROJECT",
+  VIEW_DASHBOARD: "VIEW_DASHBOARD",
+  VIEW_ACTIVITY: "VIEW_ACTIVITY",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -24,20 +29,39 @@ export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 const ROLE_PERMISSIONS: Record<OrganizationRole, readonly Permission[]> = {
   OWNER: [
     PERMISSIONS.CREATE_PROJECT,
+    PERMISSIONS.UPDATE_PROJECT,
     PERMISSIONS.DELETE_PROJECT,
-    PERMISSIONS.MANAGE_MEMBERS,
-    PERMISSIONS.ROLE_MANAGEMENT,
-    PERMISSIONS.CREATE_TASK,
     PERMISSIONS.DELETE_ORGANIZATION,
-    PERMISSIONS.DELETE_BUTTONS,
+    PERMISSIONS.MANAGE_MEMBERS,
+    PERMISSIONS.CREATE_TASK,
+    PERMISSIONS.UPDATE_TASK,
+    PERMISSIONS.DELETE_TASK,
+    PERMISSIONS.ASSIGN_TASK,
+    PERMISSIONS.VIEW_PROJECT,
+    PERMISSIONS.VIEW_DASHBOARD,
+    PERMISSIONS.VIEW_ACTIVITY,
   ],
   ADMIN: [
     PERMISSIONS.CREATE_PROJECT,
+    PERMISSIONS.UPDATE_PROJECT,
     PERMISSIONS.MANAGE_MEMBERS,
     PERMISSIONS.CREATE_TASK,
+    PERMISSIONS.UPDATE_TASK,
+    PERMISSIONS.DELETE_TASK,
+    PERMISSIONS.ASSIGN_TASK,
+    PERMISSIONS.VIEW_PROJECT,
+    PERMISSIONS.VIEW_DASHBOARD,
+    PERMISSIONS.VIEW_ACTIVITY,
   ],
-  MEMBER: [PERMISSIONS.CREATE_TASK],
-  VIEWER: [],
+  MEMBER: [
+    PERMISSIONS.VIEW_PROJECT,
+    PERMISSIONS.VIEW_DASHBOARD,
+    PERMISSIONS.VIEW_ACTIVITY,
+    PERMISSIONS.CREATE_TASK,
+    PERMISSIONS.UPDATE_TASK,
+    PERMISSIONS.ASSIGN_TASK,
+  ],
+  VIEWER: [PERMISSIONS.VIEW_PROJECT, PERMISSIONS.VIEW_DASHBOARD, PERMISSIONS.VIEW_ACTIVITY],
 };
 
 export function hasPermission(role: OrganizationRole | null | undefined, permission: Permission): boolean {
@@ -68,12 +92,16 @@ export function canShowDeleteProject(role: OrganizationRole | null | undefined) 
   return hasPermission(role, PERMISSIONS.DELETE_PROJECT);
 }
 
-export function canShowManageMembers(role: OrganizationRole | null | undefined) {
-  return hasPermission(role, PERMISSIONS.MANAGE_MEMBERS);
+export function canShowUpdateProject(role: OrganizationRole | null | undefined) {
+  return hasPermission(role, PERMISSIONS.UPDATE_PROJECT);
 }
 
-export function canShowRoleManagement(role: OrganizationRole | null | undefined) {
-  return hasPermission(role, PERMISSIONS.ROLE_MANAGEMENT);
+export function canShowDeleteTask(role: OrganizationRole | null | undefined) {
+  return hasPermission(role, PERMISSIONS.DELETE_TASK);
+}
+
+export function canShowManageMembers(role: OrganizationRole | null | undefined) {
+  return hasPermission(role, PERMISSIONS.MANAGE_MEMBERS);
 }
 
 export function canShowCreateTask(role: OrganizationRole | null | undefined) {
@@ -84,6 +112,10 @@ export function canShowDeleteOrganization(role: OrganizationRole | null | undefi
   return hasPermission(role, PERMISSIONS.DELETE_ORGANIZATION);
 }
 
-export function canShowDeleteButtons(role: OrganizationRole | null | undefined) {
-  return hasPermission(role, PERMISSIONS.DELETE_BUTTONS);
+export function canViewDashboard(role: OrganizationRole | null | undefined) {
+  return hasPermission(role, PERMISSIONS.VIEW_DASHBOARD);
+}
+
+export function canViewActivity(role: OrganizationRole | null | undefined) {
+  return hasPermission(role, PERMISSIONS.VIEW_ACTIVITY);
 }

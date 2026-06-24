@@ -14,7 +14,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useProjectDisplayName } from "@/hooks/use-project-display-name";
 import { useTasks } from "@/hooks/useTasks";
+import { useProjects } from "@/hooks/use-projects";
 import type { Task } from "@/types/task";
+import { RecentActivityFeed } from "@/components/dashboard/recent-activity-feed";
 
 type DashboardContentProps = {
   projectId?: string;
@@ -38,6 +40,7 @@ function deriveCoordinationStatus(tasks: Task[]) {
 
 function DashboardContent({ projectId }: DashboardContentProps) {
   const { tasks, loading, error, refetch } = useTasks(projectId);
+  const { selectedProject } = useProjects();
   const projectName = useProjectDisplayName(projectId);
 
   const safeTasks = Array.isArray(tasks) ? tasks : [];
@@ -205,6 +208,10 @@ function DashboardContent({ projectId }: DashboardContentProps) {
               </div>
             </CardContent>
           </Card>
+        </section>
+
+        <section className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
+          <RecentActivityFeed project={selectedProject} tasks={safeTasks} />
         </section>
       </motion.div>
     </PageContainer>
