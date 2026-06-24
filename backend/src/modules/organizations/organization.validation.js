@@ -10,13 +10,13 @@ const updateOrgSchema = z.object({
 
 const inviteSchema = z.object({
   email: z.string().email(),
-  role: z.enum(["OWNER", "ADMIN", "MEMBER"]).optional(),
+  role: z.enum(["OWNER", "ADMIN", "MEMBER", "VIEWER"]).optional(),
   expiresInDays: z.number().int().min(1).max(30).optional(),
 });
 
 const addMemberSchema = z.object({
   userId: z.string().uuid(),
-  role: z.enum(["OWNER", "ADMIN", "MEMBER"]).optional(),
+  role: z.enum(["OWNER", "ADMIN", "MEMBER", "VIEWER"]).optional(),
 });
 
 module.exports = {

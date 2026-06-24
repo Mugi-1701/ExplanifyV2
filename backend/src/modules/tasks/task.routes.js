@@ -6,6 +6,7 @@ const taskController = require("./task.controller");
 const taskMiddleware = require("./task.middleware");
 
 const { authenticate } = require("../auth/auth.middleware");
+const { requirePermission, requirePermissionIfBodyField } = require("../../middleware/require-permission");
 
 const {
   requireOrgMembership,
@@ -66,6 +67,8 @@ router.post(
   validate(createTaskSchema),
   extractTasksContext,
   requireOrgMembership(),
+  requirePermission("CREATE_TASK"),
+  requirePermissionIfBodyField("ASSIGN_TASK", "assigneeId"),
   taskController.createTask
 );
 
@@ -174,6 +177,8 @@ router.get(
 router.patch(
   "/:taskId",
   validate(updateTaskSchema),
+  requirePermission("UPDATE_TASK"),
+  requirePermissionIfBodyField("ASSIGN_TASK", "assigneeId"),
   taskController.updateTask
 );
 
@@ -183,6 +188,7 @@ router.patch(
  */
 router.delete(
   "/:taskId",
+  requirePermission("DELETE_TASK"),
   taskController.deleteTask
 );
 

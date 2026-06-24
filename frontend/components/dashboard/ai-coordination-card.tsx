@@ -91,18 +91,18 @@ function AICoordinationCard({ tasks }: AICoordinationCardProps) {
           <div className="grid gap-3 rounded-2xl border border-blue-400/15 bg-blue-500/10 p-4 text-sm text-white/75">
             <div className="flex items-center gap-2 text-blue-200">
               <Sparkles className="size-4" />
-              Coordination explanation
+              Coordination Explanation
             </div>
             <p className="leading-6">
               {blockedTasks.length > 0
-                ? blockedTasks[0]?.coordinationReason ?? "One or more dependencies are still incomplete."
-                : "All dependencies are completed. The workspace is ready for the next execution step."}
+                ? `Waiting for ${blockedTasks[0]?.blockingTasks?.[0]?.title ?? "dependencies"}`
+                : "All dependencies satisfied."}
             </p>
             <div className="flex items-center gap-2 text-emerald-300">
               <CircleCheckBig className="size-4" />
               {totalBlockingDependencies > 0
                 ? `${totalBlockingDependencies} dependency${totalBlockingDependencies === 1 ? " is" : "ies are"} still influencing task flow.`
-                : "Ready tasks surface automatically when dependencies complete."}
+                : "Task flow is clear and execution can proceed."}
             </div>
           </div>
         </CardContent>

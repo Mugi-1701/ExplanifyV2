@@ -54,7 +54,7 @@ model Membership {
   id           String       @id @default(uuid())
   orgId        String
   userId       String
-  role         OrgRole      @default(MEMBER)
+  role         OrganizationRole @default(MEMBER)
   createdAt    DateTime     @default(now())
   organization Organization @relation(fields: [orgId], references: [id])
   user         User         @relation(fields: [userId], references: [id])
@@ -356,6 +356,13 @@ enum OrgRole {
   MEMBER
 }
 
+enum OrganizationRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
 enum OrganizationInviteStatus {
   PENDING
   ACCEPTED
@@ -369,9 +376,9 @@ enum TeamRole {
 }
 
 enum ProjectRole {
-  OWNER
   LEAD
   MEMBER
+  VIEWER
 }
 
 enum ProjectStatus {
