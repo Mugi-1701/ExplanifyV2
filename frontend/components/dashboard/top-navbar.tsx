@@ -1,10 +1,11 @@
 "use client";
 
-import { Bell, Menu, Search, Zap } from "lucide-react";
+import { Menu, Search, Zap } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
+import { NotificationDropdown } from "@/components/notifications/notification-dropdown";
 
 type TopNavbarProps = {
   onMenuClick: () => void;
@@ -50,9 +51,7 @@ function TopNavbar({ onMenuClick }: TopNavbarProps) {
             <Zap className="size-4" />
             AI Live
           </div>
-          <Button type="button" variant="ghost" size="icon-sm" className="border border-white/10 bg-white/5 text-white/80 hover:bg-white/10" aria-label="Notifications">
-            <Bell className="size-5" />
-          </Button>
+          <NotificationDropdown />
           <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 backdrop-blur-xl">
             <div className="flex size-9 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-blue-500 text-xs font-semibold text-white shadow-[0_0_24px_rgba(59,130,246,0.24)]">
               {initials || "EX"}
