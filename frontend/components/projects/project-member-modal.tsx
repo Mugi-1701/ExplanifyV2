@@ -7,6 +7,8 @@ import { Check, ChevronDown, Pencil, Plus, Search, Trash2, X } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { getApiErrorMessage } from "@/lib/api-errors";
+import { canShowManageMembers, canShowRoleManagement } from "@/lib/rbac";
+import { useRole } from "@/hooks/useRole";
 import { useToast } from "@/components/ui/toast";
 import type { AddProjectMemberInput, ProjectMember } from "@/types/project";
 import type { WorkspaceUser } from "@/services/users.service";
@@ -30,6 +32,9 @@ type FormState = {
 
 function ProjectMemberModal({ open, users, mode, member, onClose, onSubmit }: ProjectMemberModalProps) {
   const { toast } = useToast();
+  const role = useRole();
+  const allowMemberManagement = canShowManageMembers(role);
+  const allowRoleManagement = canShowRoleManagement(role);
   const [roles, setRoles] = useState<WorkspaceRole[]>([]);
   const [skills, setSkills] = useState<WorkspaceSkill[]>([]);
   const [values, setValues] = useState<FormState>({ userId: "", roleId: "", skillIds: [] });
@@ -273,8 +278,9 @@ function ProjectMemberModal({ open, users, mode, member, onClose, onSubmit }: Pr
           options={roleOptions}
           placeholder="Search or create role"
           boxRef={roleRootRef}
-          creatable
+          creatable={allowRoleManagement}
           onEdit={(id) => {
+            if (!allowRoleManagement) return;
             const role = roles.find((item) => item.id === id);
             if (!role) return;
             setEditingRole(id);
@@ -282,17 +288,20 @@ function ProjectMemberModal({ open, users, mode, member, onClose, onSubmit }: Pr
             setRoleModalOpen(true);
           }}
           onDelete={(id) => {
+            if (!allowRoleManagement) return;
             const role = roles.find((item) => item.id === id);
             if (!role) return;
             setDeleteTarget({ type: "role", id, label: role.name });
           }}
         />
-        <div className="flex justify-end -mt-2">
-          <Button type="button" variant="outline" size="sm" onClick={() => { setEditingRole(null); setCatalogName(""); setRoleModalOpen(true); }} className="rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10">
-            <Plus className="mr-2 size-4" />
-            Add Role
-          </Button>
-        </div>
+        {allowRoleManagement ? (
+          <div className="flex justify-end -mt-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => { setEditingRole(null); setCatalogName(""); setRoleModalOpen(true); }} className="rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10">
+              <Plus className="mr-2 size-4" />
+              Add Role
+            </Button>
+          </div>
+        ) : null}
 
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3">
@@ -389,7 +398,7 @@ function ProjectMemberModal({ open, users, mode, member, onClose, onSubmit }: Pr
           <Button type="button" variant="outline" onClick={onClose} className="rounded-2xl border-white/10 bg-white/5 text-white hover:bg-white/10">
             Cancel
           </Button>
-          <Button type="submit" disabled={submitting || !values.userId} className="rounded-2xl bg-gradient-to-r from-violet-500 to-blue-500 text-white hover:opacity-95 disabled:opacity-50">
+          <Button type="submit" disabled={submitting || !values.userId || !allowMemberManagement} className="rounded-2xl bg-gradient-to-r from-violet-500 to-blue-500 text-white hover:opacity-95 disabled:opacity-50">
             {submitting ? (mode === "add" ? "Adding..." : "Saving...") : mode === "add" ? "Add member" : "Save member"}
           </Button>
         </div>

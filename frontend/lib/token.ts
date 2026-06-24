@@ -127,6 +127,10 @@ export function getActiveOrgIdFromAccessToken() {
   return decodeAccessToken()?.activeOrgId ?? null;
 }
 
+export function getActiveOrgRoleFromAccessToken() {
+  return decodeAccessToken()?.orgRole ?? null;
+}
+
 /**
  * Check if token exists (basic auth state)
  */

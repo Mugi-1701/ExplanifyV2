@@ -5,6 +5,8 @@ import { LayoutGrid, List, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { canShowCreateProject } from "@/lib/rbac";
+import { useRole } from "@/hooks/useRole";
 import type { ProjectStats } from "@/types/project";
 
 type ProjectToolbarProps = {
@@ -30,6 +32,9 @@ function ProjectToolbar({
   onHealthFilterChange,
   onCreateProject,
 }: ProjectToolbarProps) {
+  const role = useRole();
+  const showCreateProject = canShowCreateProject(role);
+
   return (
     <div className="flex w-full flex-col gap-3 rounded-3xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur-xl xl:flex-row xl:items-center xl:justify-between">
       <div className="shrink-0">
@@ -99,10 +104,12 @@ function ProjectToolbar({
             </button>
           </div>
 
-          <Button onClick={onCreateProject} className="h-12 rounded-2xl bg-gradient-to-r from-violet-500 to-blue-500 text-white hover:opacity-95">
-            <Plus className="mr-2 size-4" />
-            Create project
-          </Button>
+          {showCreateProject ? (
+            <Button onClick={onCreateProject} className="h-12 rounded-2xl bg-gradient-to-r from-violet-500 to-blue-500 text-white hover:opacity-95">
+              <Plus className="mr-2 size-4" />
+              Create project
+            </Button>
+          ) : null}
         </div>
       </div>
     </div>

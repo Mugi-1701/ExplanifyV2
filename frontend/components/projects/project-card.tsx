@@ -8,6 +8,8 @@ import { getTeams, type Team } from "@/services/team.service";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { canShowDeleteProject } from "@/lib/rbac";
+import { useRole } from "@/hooks/useRole";
 import type { ProjectWithStats } from "@/types/project";
 import { formatProjectDate, getCoordinationLabel, getCoordinationTone } from "./project-utils";
 
@@ -19,6 +21,8 @@ type ProjectCardProps = {
 };
 
 function ProjectCard({ project, onSelect, onEdit, onDelete }: ProjectCardProps) {
+  const role = useRole();
+  const showDelete = canShowDeleteProject(role);
   const organizationLabel = project.organization?.name ?? project.orgId ?? null;
   const createdLabel = `Created ${formatProjectDate(project.createdAt)}`;
   // debug logs to verify incoming data
@@ -219,16 +223,18 @@ function ProjectCard({ project, onSelect, onEdit, onDelete }: ProjectCardProps) 
                       <PencilLine className="size-4" />
                       Edit
                     </button>
-                    <button
-                      className="flex w-full items-center gap-2 rounded px-2 py-2 text-left text-sm text-red-100 hover:bg-red-500/10"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        onDelete(project);
-                      }}
-                    >
-                      <Trash2 className="size-4" />
-                      Delete
-                    </button>
+                    {showDelete ? (
+                      <button
+                        className="flex w-full items-center gap-2 rounded px-2 py-2 text-left text-sm text-red-100 hover:bg-red-500/10"
+                        onClick={() => {
+                          setMenuOpen(false);
+                          onDelete(project);
+                        }}
+                      >
+                        <Trash2 className="size-4" />
+                        Delete
+                      </button>
+                    ) : null}
                   </div>
                 ) : null}
               </div>

@@ -4,6 +4,8 @@ import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ActivityTimeline } from "@/components/events";
+import { canShowDeleteProject, canShowManageMembers, canShowRoleManagement } from "@/lib/rbac";
+import { useRole } from "@/hooks/useRole";
 import type { ProjectMember, ProjectWithStats } from "@/types/project";
 import { formatProjectDate, getCoordinationTone } from "./project-utils";
 
@@ -21,6 +23,10 @@ type ProjectInsightsCardProps = {
 };
 
 function ProjectInsightsCard({ project, activeTab, onTabChange, onAddMember, onEditMember, onRemoveMember, onEditProject, onArchiveProject, onDeleteProject, onChangeLead }: ProjectInsightsCardProps) {
+  const role = useRole();
+  const allowManageMembers = canShowManageMembers(role);
+  const allowRoleManagement = canShowRoleManagement(role);
+  const allowDeleteProject = canShowDeleteProject(role);
   if (!project) {
     return (
       <Card className="border-white/10 bg-white/[0.03]">
@@ -166,14 +172,16 @@ function ProjectInsightsCard({ project, activeTab, onTabChange, onAddMember, onE
                 <Users className="size-4 text-violet-200" />
                 Team Members
               </div>
-              <Button variant="outline" size="sm" onClick={onAddMember} className="rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10">
-                <Plus className="mr-2 size-4" />
-                Add Member
-              </Button>
+              {allowManageMembers ? (
+                <Button variant="outline" size="sm" onClick={onAddMember} className="rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10">
+                  <Plus className="mr-2 size-4" />
+                  Add Member
+                </Button>
+              ) : null}
             </div>
 
             <div className="space-y-3">
-              {members.length > 0 ? members.map((member) => <MemberCard key={member.id} member={member} tasks={tasks} onEdit={onEditMember} onRemove={onRemoveMember} />) : <p className="text-sm text-white/50">No members have been added yet.</p>}
+              {members.length > 0 ? members.map((member) => <MemberCard key={member.id} member={member} tasks={tasks} onEdit={onEditMember} onRemove={onRemoveMember} allowManageMembers={allowManageMembers} allowRoleManagement={allowRoleManagement} />) : <p className="text-sm text-white/50">No members have been added yet.</p>}
             </div>
           </div>
         ) : null}
@@ -196,11 +204,15 @@ function MemberCard({
   tasks,
   onEdit,
   onRemove,
+  allowManageMembers,
+  allowRoleManagement,
 }: {
   member: ProjectMember;
   tasks: { assigneeId?: string | null; status: string }[];
   onEdit: (member: ProjectMember) => void;
   onRemove: (member: ProjectMember) => void;
+  allowManageMembers: boolean;
+  allowRoleManagement: boolean;
 }) {
   const assignedTaskCount = member.assignedTaskCount ?? tasks.filter((task) => task.assigneeId === member.userId).length;
   const activeTaskCount = member.activeTaskCount ?? tasks.filter((task) => task.assigneeId === member.userId && task.status === "IN_PROGRESS").length;
@@ -262,14 +274,18 @@ function MemberCard({
               </div>
             ) : null}
 
+          {allowManageMembers ? (
             <div className="flex justify-start gap-2 pt-1">
-              <Button type="button" variant="outline" size="sm" onClick={() => onEdit(member)} className="h-9 rounded-full border-white/10 bg-white/5 px-4 text-white hover:bg-white/10">
-                Edit
-              </Button>
+              {allowRoleManagement ? (
+                <Button type="button" variant="outline" size="sm" onClick={() => onEdit(member)} className="h-9 rounded-full border-white/10 bg-white/5 px-4 text-white hover:bg-white/10">
+                  Edit
+                </Button>
+              ) : null}
               <Button type="button" variant="outline" size="sm" onClick={() => onRemove(member)} className="h-9 rounded-full border-red-400/15 bg-red-500/10 px-4 text-red-100 hover:bg-red-500/20">
                 Remove
               </Button>
             </div>
+          ) : null}
           </div>
         </div>
       </div>

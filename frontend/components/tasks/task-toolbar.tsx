@@ -5,6 +5,8 @@ import { Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { canShowCreateTask } from "@/lib/rbac";
+import { useRole } from "@/hooks/useRole";
 import type { CreateTaskInput, Task } from "@/types/task";
 
 type TaskToolbarProps = {
@@ -26,6 +28,9 @@ function TaskToolbar({
   onPriorityFilterChange,
   onCreateTask,
 }: TaskToolbarProps) {
+  const role = useRole();
+  const showCreateTask = canShowCreateTask(role);
+
   const statusOptions = [
     { value: "ALL", label: "All status" },
     { value: "TODO", label: "To Do" },
@@ -85,13 +90,15 @@ function TaskToolbar({
             />
           </div>
 
-          <Button
-            onClick={onCreateTask}
-            className="h-14 shrink-0 whitespace-nowrap rounded-2xl bg-gradient-to-r from-violet-500 to-blue-500 text-white hover:opacity-95 md:ml-auto"
-          >
-            <Plus className="mr-2 size-4" />
-            Create Task
-          </Button>
+          {showCreateTask ? (
+            <Button
+              onClick={onCreateTask}
+              className="h-14 shrink-0 whitespace-nowrap rounded-2xl bg-gradient-to-r from-violet-500 to-blue-500 text-white hover:opacity-95 md:ml-auto"
+            >
+              <Plus className="mr-2 size-4" />
+              Create Task
+            </Button>
+          ) : null}
         </div>
       </div>
     </div>

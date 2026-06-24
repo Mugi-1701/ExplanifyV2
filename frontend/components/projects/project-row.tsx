@@ -5,6 +5,8 @@ import { CheckCircle2, PencilLine, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { canShowDeleteProject } from "@/lib/rbac";
+import { useRole } from "@/hooks/useRole";
 import type { ProjectWithStats } from "@/types/project";
 import { formatProjectDate, getCoordinationLabel, getCoordinationTone } from "./project-utils";
 
@@ -16,6 +18,8 @@ type ProjectRowProps = {
 };
 
 function ProjectRow({ project, onSelect, onEdit, onDelete }: ProjectRowProps) {
+  const role = useRole();
+  const showDelete = canShowDeleteProject(role);
   const organizationLabel = project.organization?.name ?? project.orgId ?? null;
   const metadataLabel = organizationLabel ? `${organizationLabel} • ${project.isActive ? "Active" : "Selectable"}` : project.isActive ? "Active" : "Selectable";
 
@@ -55,10 +59,12 @@ function ProjectRow({ project, onSelect, onEdit, onDelete }: ProjectRowProps) {
             <PencilLine className="mr-2 size-4" />
             Edit
           </Button>
-          <Button variant="outline" size="sm" onClick={() => onDelete(project)} className="rounded-full border-red-400/15 bg-red-500/10 text-red-100 hover:bg-red-500/20">
-            <Trash2 className="mr-2 size-4" />
-            Delete
-          </Button>
+          {showDelete ? (
+            <Button variant="outline" size="sm" onClick={() => onDelete(project)} className="rounded-full border-red-400/15 bg-red-500/10 text-red-100 hover:bg-red-500/20">
+              <Trash2 className="mr-2 size-4" />
+              Delete
+            </Button>
+          ) : null}
         </div>
       </div>
     </Card>

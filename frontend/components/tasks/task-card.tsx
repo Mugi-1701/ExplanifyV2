@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
+import { canShowDeleteButtons } from "@/lib/rbac";
+import { useRole } from "@/hooks/useRole";
 import type { CreateTaskInput, Task } from "@/types/task";
 import { TaskBadges } from "./task-badges";
 import { getTaskDependencyNodes } from "./task-utils";
@@ -21,6 +23,8 @@ type TaskCardProps = {
 };
 
 function TaskCard({ task, onUpdateStatus, onUpdatePriority, onDelete, onEdit, onSelectTask }: TaskCardProps) {
+  const role = useRole();
+  const showDelete = canShowDeleteButtons(role);
   const dependencyNodes = getTaskDependencyNodes(task);
   const dependencyCount = dependencyNodes.length;
   const formattedUpdatedAt = task.updatedAt
@@ -144,10 +148,12 @@ function TaskCard({ task, onUpdateStatus, onUpdatePriority, onDelete, onEdit, on
               <Edit3 className="mr-2 size-4" />
               Edit
             </Button>
-            <Button variant="outline" size="sm" className="rounded-full border-red-400/15 bg-red-500/10 text-red-100 hover:bg-red-500/20" onClick={() => onDelete(task)}>
-              <Trash2 className="mr-2 size-4" />
-              Delete
-            </Button>
+            {showDelete ? (
+              <Button variant="outline" size="sm" className="rounded-full border-red-400/15 bg-red-500/10 text-red-100 hover:bg-red-500/20" onClick={() => onDelete(task)}>
+                <Trash2 className="mr-2 size-4" />
+                Delete
+              </Button>
+            ) : null}
           </div>
         </CardContent>
       </Card>
