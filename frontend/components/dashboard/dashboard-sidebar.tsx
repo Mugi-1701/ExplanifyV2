@@ -7,7 +7,8 @@ import { ChevronLeft, PanelLeft, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { getSidebarNavItemActive, sidebarNavItems } from "@/components/layout/sidebar-nav.config";
+import { getSidebarNavItemActive, resolveSidebarNavItemHref, sidebarNavItems } from "@/components/layout/sidebar-nav.config";
+import { useActiveProjectId } from "@/hooks/use-active-project-id";
 
 type DashboardSidebarProps = {
   open: boolean;
@@ -20,6 +21,7 @@ type SidebarContentProps = {
 
 function SidebarContent({ onNavigate }: SidebarContentProps) {
   const pathname = usePathname();
+  const activeProjectId = useActiveProjectId();
 
   return (
     <div className="hidden-scrollbar flex h-full flex-col gap-6 overflow-y-auto p-4">
@@ -39,11 +41,12 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
       <div className="space-y-1">
         {sidebarNavItems.map((item) => {
           const Icon = item.icon;
-          const isActive = getSidebarNavItemActive(pathname, item.href);
+          const href = resolveSidebarNavItemHref(item.href, activeProjectId);
+          const isActive = getSidebarNavItemActive(pathname, href);
           return (
             <motion.div key={item.label} whileHover={{ x: 4 }} whileTap={{ scale: 0.98 }}>
               <Link
-                href={item.href}
+                href={href}
                 onClick={onNavigate}
                 className={cn(
                   "group relative flex w-full items-center gap-3 overflow-hidden rounded-2xl border px-4 py-3 text-left transition",

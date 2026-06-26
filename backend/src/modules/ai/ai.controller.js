@@ -2,6 +2,7 @@ const { asyncHandler } = require("../../utils/async-handler");
 const { AppError } = require("../../utils/AppError");
 const { recommendAssignee, getRebalancingSuggestions } = require("./ai.service");
 const { analyzeProjectWorkload } = require("./workload/workload.service");
+const { getKanbanInsights } = require("./kanban.service");
 
 const recommendAssigneeHandler = asyncHandler(async (req, res) => {
   const projectId = req.params.projectId ?? req.body.projectId;
@@ -55,8 +56,20 @@ const getRebalanceSuggestions = asyncHandler(async (req, res) => {
   return res.status(200).json(result);
 });
 
+const getKanbanInsightsHandler = asyncHandler(async (req, res) => {
+  const projectId = req.params.projectId;
+  if (!projectId) {
+    throw new AppError("projectId is required", 400);
+  }
+
+  const insights = await getKanbanInsights(projectId, req.orgId, req.auth.userId);
+
+  return res.status(200).json({ data: insights });
+});
+
 module.exports = {
   recommendAssigneeHandler,
   getProjectWorkloadHandler,
   getRebalanceSuggestions,
+  getKanbanInsightsHandler,
 };

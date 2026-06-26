@@ -65,6 +65,14 @@ function syncProjectTasksCache(queryClient: ReturnType<typeof useQueryClient>, p
   );
 }
 
+async function invalidateKanbanRelatedQueries(queryClient: ReturnType<typeof useQueryClient>, projectId: string) {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: queryKeys.tasks(projectId), refetchType: "active" }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.aiKanbanInsights(projectId), refetchType: "active" }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.aiWorkloadAnalysis(projectId), refetchType: "active" }),
+  ]);
+}
+
 function TasksPage({ projectId }: TasksPageProps) {
   // === HOOKS: queries first ===
   const queryClient = useQueryClient();
@@ -175,7 +183,7 @@ function TasksPage({ projectId }: TasksPageProps) {
       );
       updateProjectStatsCache(queryClient, context.projectId);
       syncProjectTasksCache(queryClient, context.projectId);
-      void queryClient.invalidateQueries({ queryKey: queryKeys.tasks(context.projectId), refetchType: "active" });
+      void invalidateKanbanRelatedQueries(queryClient, context.projectId);
       void queryClient.invalidateQueries({ queryKey: eventQueryKey("project", context.projectId) });
       recordInteraction(task.id);
       // eslint-disable-next-line no-console
@@ -249,6 +257,7 @@ function TasksPage({ projectId }: TasksPageProps) {
       );
       updateProjectStatsCache(queryClient, context.projectId);
       syncProjectTasksCache(queryClient, context.projectId);
+      void invalidateKanbanRelatedQueries(queryClient, context.projectId);
       void queryClient.invalidateQueries({ queryKey: eventQueryKey("project", context.projectId) });
 
       if (variables.input.status !== undefined) {
@@ -321,6 +330,7 @@ function TasksPage({ projectId }: TasksPageProps) {
       );
       updateProjectStatsCache(queryClient, context.projectId);
       syncProjectTasksCache(queryClient, context.projectId);
+      void invalidateKanbanRelatedQueries(queryClient, context.projectId);
       void queryClient.invalidateQueries({ queryKey: eventQueryKey("project", context.projectId) });
       toast({
         title: "Task deleted",
@@ -341,7 +351,7 @@ function TasksPage({ projectId }: TasksPageProps) {
         const projectKey = result.task.projectId ?? resolvedProjectId!;
         updateProjectStatsCache(queryClient, projectKey);
         syncProjectTasksCache(queryClient, projectKey);
-        void queryClient.invalidateQueries({ queryKey: queryKeys.tasks(projectKey) });
+        void invalidateKanbanRelatedQueries(queryClient, projectKey);
       }
       toast({
         title: "Task scheduled",

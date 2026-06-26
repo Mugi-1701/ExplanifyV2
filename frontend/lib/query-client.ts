@@ -26,6 +26,8 @@ const queryKeys = {
   project: (projectId: string | null | undefined) => ["project", projectId ?? "__active__"] as const,
   tasks: (projectId: string | null | undefined) => ["tasks", projectId ?? "__active__"] as const,
   task: (taskId: string) => ["task", taskId] as const,
+  aiKanbanInsights: (projectId: string | null | undefined) => ["ai-kanban-insights", projectId ?? "__active__"] as const,
+  aiWorkloadAnalysis: (projectId: string | null | undefined) => ["ai-workload-analysis", projectId ?? "__active__"] as const,
 };
 
 export { keepPreviousData, queryClient, queryDefaults, queryKeys };

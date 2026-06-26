@@ -7,7 +7,8 @@ import { ChevronLeft, LogOut, Sparkles } from "lucide-react";
 import type React from "react";
 
 import { cn } from "@/lib/utils";
-import { getSidebarNavItemActive, sidebarNavItems } from "@/components/layout/sidebar-nav.config";
+import { getSidebarNavItemActive, resolveSidebarNavItemHref, sidebarNavItems } from "@/components/layout/sidebar-nav.config";
+import { useActiveProjectId } from "@/hooks/use-active-project-id";
 
 type SidebarProps = {
   isOpen: boolean;
@@ -118,12 +119,14 @@ function SidebarFooter({ user, onLogout }: { user?: SidebarProps["user"]; onLogo
 
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const activeProjectId = useActiveProjectId();
 
   return (
     <div className="space-y-1.5">
       {sidebarNavItems.map((item) => {
         const Icon = item.icon;
-        const isActive = getSidebarNavItemActive(pathname, item.href);
+        const href = resolveSidebarNavItemHref(item.href, activeProjectId);
+        const isActive = getSidebarNavItemActive(pathname, href);
 
         return (
           <motion.div
@@ -132,7 +135,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
             whileTap={{ scale: 0.99 }}
             transition={{ type: "spring", stiffness: 300, damping: 24 }}
           >
-            <SidebarNavItem label={item.label} href={item.href} Icon={Icon} isActive={isActive} onClick={onNavigate} />
+            <SidebarNavItem label={item.label} href={href} Icon={Icon} isActive={isActive} onClick={onNavigate} />
           </motion.div>
         );
       })}
