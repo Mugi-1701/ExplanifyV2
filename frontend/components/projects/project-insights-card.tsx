@@ -1,13 +1,21 @@
-import { CalendarDays, ListTodo, Plus, Sparkles, Users, Crown } from "lucide-react";
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { AlertTriangle, CalendarDays, ChevronRight, Crown, ListTodo, Plus, Sparkles, Users } from "lucide-react";
 import { Select } from "@/components/ui/select";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ActivityTimeline } from "@/components/events";
 import { canShowDeleteProject, canShowManageMembers } from "@/lib/rbac";
+import { queryDefaults } from "@/lib/query-client";
 import { useRole } from "@/hooks/useRole";
+import { getWorkloadAnalysis } from "@/services/ai.service";
 import type { ProjectMember, ProjectWithStats } from "@/types/project";
 import { formatProjectDate, getCoordinationTone } from "./project-utils";
+import { RecommendationCard } from "./recommendation-card";
+import { RecommendationModal } from "./recommendation-modal";
 
 type ProjectInsightsCardProps = {
   project: ProjectWithStats | null;
@@ -23,10 +31,23 @@ type ProjectInsightsCardProps = {
 };
 
 function ProjectInsightsCard({ project, activeTab, onTabChange, onAddMember, onEditMember, onRemoveMember, onEditProject, onArchiveProject, onDeleteProject, onChangeLead }: ProjectInsightsCardProps) {
+  const [recommendationsOpen, setRecommendationsOpen] = useState(false);
   const role = useRole();
   const allowManageMembers = canShowManageMembers(role);
   const allowRoleManagement = canShowManageMembers(role);
   const allowDeleteProject = canShowDeleteProject(role);
+  const workloadQuery = useQuery({
+    queryKey: ["ai-workload-analysis", project?.id ?? "__missing__"],
+    queryFn: () => getWorkloadAnalysis(project?.id ?? ""),
+    enabled: Boolean(project?.id),
+    staleTime: queryDefaults.staleTime,
+    gcTime: queryDefaults.gcTime,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    retry: 1,
+  });
+
   if (!project) {
     return (
       <Card className="border-white/10 bg-white/[0.03]">
@@ -41,6 +62,7 @@ function ProjectInsightsCard({ project, activeTab, onTabChange, onAddMember, onE
   const members = project.members ?? [];
   const tasks = project.tasks ?? [];
   const progress = project.progressPercentage ?? project.stats?.progressPercentage ?? 0;
+  const workloadAnalysis = workloadQuery.data ?? null;
 
   return (
     <Card className="border-white/10 bg-white/[0.03]">
@@ -119,6 +141,12 @@ function ProjectInsightsCard({ project, activeTab, onTabChange, onAddMember, onE
                 />
               </div>
             </div>
+
+            <WorkloadAnalysisSection
+              analysis={workloadAnalysis}
+              isLoading={workloadQuery.isLoading}
+              onViewAllRecommendations={() => setRecommendationsOpen(true)}
+            />
           </>
         ) : null}
 
@@ -195,6 +223,11 @@ function ProjectInsightsCard({ project, activeTab, onTabChange, onAddMember, onE
           />
         ) : null}
       </CardContent>
+      <RecommendationModal
+        open={recommendationsOpen}
+        recommendations={workloadAnalysis?.recommendations ?? []}
+        onClose={() => setRecommendationsOpen(false)}
+      />
     </Card>
   );
 }
@@ -285,7 +318,9 @@ function MemberCard({
                 Remove
               </Button>
             </div>
-          ) : null}
+          ) : (
+            <p className="text-sm text-white/50">No reassignment recommendation at this time.</p>
+          )}
           </div>
         </div>
       </div>
@@ -298,6 +333,158 @@ function Metric({ label, value }: { label: string; value: number }) {
     <div className="rounded-xl border border-white/10 bg-black/20 px-2 py-1.5">
       <p className="text-[10px] uppercase tracking-[0.14em] text-white/40">{label}</p>
       <p className="mt-0.5 text-base font-semibold leading-none text-white">{value}</p>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: "AVAILABLE" | "HEALTHY" | "BUSY" | "OVERLOADED" }) {
+  const tone = {
+    AVAILABLE: "border-emerald-400/20 bg-emerald-500/10 text-emerald-100",
+    HEALTHY: "border-blue-400/20 bg-blue-500/10 text-blue-100",
+    BUSY: "border-amber-400/20 bg-amber-500/10 text-amber-100",
+    OVERLOADED: "border-red-400/20 bg-red-500/10 text-red-100",
+  } as const;
+
+  const label = {
+    AVAILABLE: "Available",
+    HEALTHY: "Healthy",
+    BUSY: "Busy",
+    OVERLOADED: "Overloaded",
+  } as const;
+
+  return (
+    <span className={`mt-2 inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-[11px] font-medium ${tone[status]}`}>
+      <span
+        className={`mr-1.5 inline-block size-1.5 rounded-full ${
+          status === "OVERLOADED"
+            ? "bg-red-400"
+            : status === "BUSY"
+              ? "bg-amber-400"
+              : status === "AVAILABLE"
+                ? "bg-emerald-400"
+                : "bg-blue-400"
+        }`}
+      />
+      {label[status]}
+    </span>
+  );
+}
+
+
+
+function WorkloadAnalysisSection({
+  analysis,
+  isLoading,
+  onViewAllRecommendations,
+}: {
+  analysis: {
+    status: "IMBALANCED" | "BALANCED";
+    projectHealth: number;
+    members: Array<{
+      memberId: string;
+      name: string;
+      workload: number;
+      calendarHours: number;
+      activeTasks: number;
+      inProgressTasks: number;
+      pendingTasks: number;
+      completedTasks: number;
+      utilization: number;
+      status: "AVAILABLE" | "HEALTHY" | "BUSY" | "OVERLOADED";
+    }>;
+    recommendations: Array<{ taskId: string; taskTitle: string; from: string; to: string; priority?: "HIGH" | "MEDIUM" | "LOW"; confidence?: "HIGH" | "MEDIUM" | "LOW"; reason: string[] }>;
+  } | null;
+  isLoading: boolean;
+  onViewAllRecommendations: () => void;
+}) {
+  const members = analysis?.members ?? [];
+  const overloadedMembers = members.filter((member) => member.status === "OVERLOADED");
+  const availableMembers = members.filter((member) => member.status === "AVAILABLE");
+  const status = analysis?.status ?? null;
+  const displayStatus = overloadedMembers.length > 0 ? "OVERLOADED" : status;
+  const projectHealth = analysis?.projectHealth ?? null;
+  const recommendations = analysis?.recommendations ?? [];
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+      <div className="flex items-center gap-2 text-white">
+        <AlertTriangle className={`size-4 ${displayStatus === "OVERLOADED" || displayStatus === "IMBALANCED" ? "text-amber-300" : "text-emerald-300"}`} />
+        <p className="text-sm font-medium">AI Workload Analysis</p>
+      </div>
+
+      {isLoading ? (
+        <p className="mt-3 text-sm text-white/50">Analyzing workload balance...</p>
+      ) : (
+        <div className="mt-3 space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            {displayStatus ? (
+              <span
+                className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                  displayStatus === "OVERLOADED" || displayStatus === "IMBALANCED"
+                    ? "border-amber-400/20 bg-amber-500/10 text-amber-100"
+                    : "border-emerald-400/20 bg-emerald-500/10 text-emerald-100"
+                }`}
+              >
+                {displayStatus === "OVERLOADED" ? "Workload Overloaded" : displayStatus === "IMBALANCED" ? "Workload Imbalance Detected" : "Workload Balanced"}
+              </span>
+            ) : null}
+            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70">
+              Project health {projectHealth ?? "—"}%
+            </span>
+            {analysis ? (
+              <>
+                <span className="rounded-full border border-red-400/20 bg-red-500/10 px-3 py-1 text-xs text-red-100">
+                  Overloaded members {overloadedMembers.length}
+                </span>
+                <span className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-100">
+                  Available members {availableMembers.length}
+                </span>
+              </>
+            ) : null}
+          </div>
+
+          {displayStatus === "OVERLOADED" ? (
+            <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 p-3 text-sm text-amber-100">
+              One or more members are overloaded. Review the recommendation below.
+            </div>
+          ) : null}
+
+                    <div className="grid gap-3 md:grid-cols-2">
+            {members.map((member) => (
+              <div key={member.memberId} className="flex h-full flex-col rounded-xl border border-white/10 bg-white/[0.03] p-4 text-white/80 transition hover:border-white/15 hover:bg-white/[0.05]">
+                <span className="block font-semibold text-lg text-white">{member.name}</span>
+                <StatusBadge status={member.status} />
+
+                <ul className="mt-3 space-y-1 text-sm text-white/70">
+                  <li>- Utilization: {Math.round(member.utilization)}%</li>
+                  <li>- Active Tasks: {member.activeTasks}</li>
+                  <li>- Pending Tasks: {member.pendingTasks}</li>
+                  <li>- Completed Tasks: {member.completedTasks}</li>
+                </ul>
+              </div>
+            ))}
+          </div>
+
+{recommendations.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-white">Recommended reassignment</p>
+              {recommendations.slice(0, 2).map((recommendation) => (
+                <RecommendationCard key={recommendation.taskId} recommendation={recommendation} />
+              ))}
+              {recommendations.length > 2 ? (
+                <button
+                  type="button"
+                  onClick={onViewAllRecommendations}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/80 transition hover:bg-white/10 hover:text-white"
+                >
+                  View All Recommendations ({recommendations.length})
+                  <ChevronRight className="size-4" />
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }
@@ -348,3 +535,11 @@ function getMemberSkillLabels(member: ProjectMember) {
 }
 
 export { ProjectInsightsCard };
+
+
+
+
+
+
+
+

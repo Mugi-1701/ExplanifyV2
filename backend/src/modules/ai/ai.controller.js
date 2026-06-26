@@ -1,6 +1,7 @@
 const { asyncHandler } = require("../../utils/async-handler");
 const { AppError } = require("../../utils/AppError");
-const { recommendAssignee, getProjectWorkload, getRebalancingSuggestions } = require("./ai.service");
+const { recommendAssignee, getRebalancingSuggestions } = require("./ai.service");
+const { analyzeProjectWorkload } = require("./workload/workload.service");
 
 const recommendAssigneeHandler = asyncHandler(async (req, res) => {
   const projectId = req.params.projectId ?? req.body.projectId;
@@ -35,10 +36,7 @@ const getProjectWorkloadHandler = asyncHandler(async (req, res) => {
     throw new AppError("projectId is required", 400);
   }
 
-  const workload = await getProjectWorkload({
-    projectId,
-    userId: req.auth.userId,
-  });
+  const workload = await analyzeProjectWorkload(projectId, req.auth.userId);
 
   return res.status(200).json({ data: workload });
 });

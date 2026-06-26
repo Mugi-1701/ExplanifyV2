@@ -5,6 +5,7 @@ const { requireOrgMembership } = require("../organizations/organization.middlewa
 const { validate } = require("../../middleware/validate");
 const { recommendAssigneeParamsSchema, recommendAssigneeBodySchema, rebalanceSuggestionsSchema } = require("./ai.validation");
 const { recommendAssigneeHandler, getProjectWorkloadHandler, getRebalanceSuggestions } = require("./ai.controller");
+const workloadRoutes = require("./workload/workload.routes");
 
 const router = express.Router();
 
@@ -34,5 +35,7 @@ router.get(
   validate(rebalanceSuggestionsSchema, "params"),
   getRebalanceSuggestions
 );
+
+router.use("/", workloadRoutes);
 
 module.exports = router;
