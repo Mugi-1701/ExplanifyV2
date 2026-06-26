@@ -14,6 +14,7 @@ import type { KanbanColumnDefinition, KanbanColumnId } from "@/services/kanban.s
 type KanbanColumnProps = {
   column: KanbanColumnDefinition;
   tasks: Task[];
+  search: string;
   draggingTaskId: string | null;
   isDragOver: boolean;
   health: KanbanInsightColumnHealth | null;
@@ -25,11 +26,13 @@ type KanbanColumnProps = {
   onTaskDrop: (taskId: string, targetColumn: KanbanColumnId) => void;
   onColumnDragEnter: (columnId: KanbanColumnId) => void;
   onColumnDragLeave: (columnId: KanbanColumnId, event: React.DragEvent<HTMLElement>) => void;
+  onClearSearch: () => void;
 };
 
 function KanbanColumn({
   column,
   tasks,
+  search,
   draggingTaskId,
   isDragOver,
   health,
@@ -41,6 +44,7 @@ function KanbanColumn({
   onTaskDrop,
   onColumnDragEnter,
   onColumnDragLeave,
+  onClearSearch,
 }: KanbanColumnProps) {
   const accentStyles: Record<KanbanColumnDefinition["tone"], string> = {
     violet: "border-violet-400/20 bg-violet-500/10 text-violet-100",
@@ -123,30 +127,47 @@ function KanbanColumn({
 
       <CardContent className="hidden-scrollbar flex-1 min-h-0 overflow-y-auto p-3">
         {tasks.length === 0 ? (
-          <div className="flex min-h-[220px] flex-col items-center justify-center rounded-3xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-8 text-center">
-            <p className="text-sm font-medium text-white">No Tasks</p>
-            <p className="mt-2 text-sm text-white/50">Drag tasks here</p>
-            {canCreateTask ? (
-              <>
-                <p className="mt-1 text-sm text-white/50">or</p>
-                <button
-                  type="button"
-                  onClick={onCreateTask}
-                  className="mt-2 rounded-full border border-violet-400/20 bg-violet-500/10 px-3 py-2 text-xs font-medium text-violet-100 transition hover:bg-violet-500/15"
-                >
-                  Create a new task
-                </button>
-              </>
-            ) : (
-              <p className="mt-2 text-sm text-white/45">Create access required to add a task here.</p>
-            )}
-          </div>
+          search ? (
+            <div className="flex min-h-[220px] flex-col items-center justify-center rounded-3xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-8 text-center">
+              <p className="text-sm font-medium text-white">No matching tasks</p>
+              <p className="mt-2 text-sm text-white/50">
+                No task matches &quot;<span className="text-white/80">{search}</span>&quot;
+              </p>
+              <button
+                type="button"
+                onClick={onClearSearch}
+                className="mt-4 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-white/70 transition hover:bg-white/10"
+              >
+                Clear Search
+              </button>
+            </div>
+          ) : (
+            <div className="flex min-h-[220px] flex-col items-center justify-center rounded-3xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-8 text-center">
+              <p className="text-sm font-medium text-white">No Tasks</p>
+              <p className="mt-2 text-sm text-white/50">Drag tasks here</p>
+              {canCreateTask ? (
+                <>
+                  <p className="mt-1 text-sm text-white/50">or</p>
+                  <button
+                    type="button"
+                    onClick={onCreateTask}
+                    className="mt-2 rounded-full border border-violet-400/20 bg-violet-500/10 px-3 py-2 text-xs font-medium text-violet-100 transition hover:bg-violet-500/15"
+                  >
+                    Create a new task
+                  </button>
+                </>
+              ) : (
+                <p className="mt-2 text-sm text-white/45">Create access required to add a task here.</p>
+              )}
+            </div>
+          )
         ) : (
           <div className="space-y-3">
             {tasks.map((task) => (
               <KanbanTaskCard
                 key={task.id}
                 task={task}
+                search={search}
                 draggable={canMoveTask}
                 isDragging={draggingTaskId === task.id}
                 onDragStart={onTaskDragStart}

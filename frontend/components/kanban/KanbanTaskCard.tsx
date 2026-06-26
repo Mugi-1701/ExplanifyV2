@@ -12,6 +12,7 @@ import type { Task } from "@/types/task";
 
 type KanbanTaskCardProps = {
   task: Task;
+  search: string;
   draggable?: boolean;
   isDragging?: boolean;
   onDragStart?: (task: Task, event: React.DragEvent<HTMLButtonElement>) => void;
@@ -65,7 +66,35 @@ function formatTaskAge(task: Task) {
   return `${labelByStatus[task.status] ?? "Aging"} ${ageDays}d`;
 }
 
-function KanbanTaskCard({ task, draggable = true, isDragging = false, onDragStart, onDragEnd }: KanbanTaskCardProps) {
+function highlightMatch(text: string, search: string) {
+  const query = search.trim();
+
+  if (!query) {
+    return text;
+  }
+
+  const lowerText = text.toLowerCase();
+  const lowerQuery = query.toLowerCase();
+  const matchIndex = lowerText.indexOf(lowerQuery);
+
+  if (matchIndex === -1) {
+    return text;
+  }
+
+  const before = text.slice(0, matchIndex);
+  const match = text.slice(matchIndex, matchIndex + query.length);
+  const after = text.slice(matchIndex + query.length);
+
+  return (
+    <>
+      {before}
+      <mark className="rounded bg-violet-400/20 px-0.5 text-inherit">{match}</mark>
+      {after}
+    </>
+  );
+}
+
+function KanbanTaskCard({ task, search, draggable = true, isDragging = false, onDragStart, onDragEnd }: KanbanTaskCardProps) {
   const ageLabel = formatTaskAge(task);
 
   return (
@@ -80,7 +109,7 @@ function KanbanTaskCard({ task, draggable = true, isDragging = false, onDragStar
           <div className="flex items-start gap-3">
             <div className="min-w-0 flex-1">
               <p className="line-clamp-2 text-sm font-semibold leading-6 text-white transition group-hover:text-violet-100">
-                {task.title}
+                {highlightMatch(task.title, search)}
               </p>
             </div>
 

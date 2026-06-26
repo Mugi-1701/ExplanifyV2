@@ -9,6 +9,7 @@ import { KanbanColumn } from "./KanbanColumn";
 import { KANBAN_COLUMNS, type KanbanBoardGroups, type KanbanColumnId } from "@/services/kanban.service";
 
 type KanbanBoardProps = {
+  search: string;
   groupedTasks: KanbanBoardGroups;
   draggingTaskId: string | null;
   dragOverColumn: KanbanColumnId | null;
@@ -21,6 +22,7 @@ type KanbanBoardProps = {
   onColumnDragEnter: (columnId: KanbanColumnId) => void;
   onColumnDragLeave: (columnId: KanbanColumnId, event: React.DragEvent<HTMLElement>) => void;
   columnHealth?: Partial<Record<KanbanColumnId, KanbanInsightColumnHealth>>;
+  onClearSearch: () => void;
 };
 
 function KanbanBoard({
@@ -36,6 +38,8 @@ function KanbanBoard({
   onColumnDragEnter,
   onColumnDragLeave,
   columnHealth,
+  search,
+  onClearSearch,
 }: KanbanBoardProps) {
   return (
     <motion.div
@@ -50,6 +54,7 @@ function KanbanBoard({
             key={column.id}
             column={column}
             tasks={groupedTasks[column.id]}
+            search={search}
             draggingTaskId={draggingTaskId}
             isDragOver={dragOverColumn === column.id}
             health={columnHealth?.[column.id] ?? null}
@@ -61,6 +66,7 @@ function KanbanBoard({
             onTaskDrop={onTaskDrop}
             onColumnDragEnter={onColumnDragEnter}
             onColumnDragLeave={onColumnDragLeave}
+            onClearSearch={onClearSearch}
           />
         ))}
       </div>

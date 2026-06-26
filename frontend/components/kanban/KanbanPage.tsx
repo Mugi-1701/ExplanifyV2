@@ -128,6 +128,8 @@ function KanbanPage({ projectId }: KanbanPageProps) {
   const projectLabel = currentProject?.name ?? projectNameFromRoute ?? "Kanban board";
   const kanbanInsights = kanbanInsightsQuery.data ?? null;
   const kanbanInsightsErrorMessage = kanbanInsightsQuery.error ? getApiErrorMessage(kanbanInsightsQuery.error, "Unable to load AI insights.") : null;
+  const trimmedSearch = search.trim();
+  const isSearching = trimmedSearch.length > 0;
   const assignees =
     currentProject?.members?.map((member) => ({
       id: member.userId,
@@ -307,49 +309,53 @@ function KanbanPage({ projectId }: KanbanPageProps) {
             </Button>
           </div>
         </div>
-
-        <div className="mt-3 flex flex-wrap gap-2 text-xs text-white/45">
-          <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1">Showing {filteredTasks.length} tasks</span>
-          <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1">{canMove ? "Drag enabled" : "Drag disabled"}</span>
-          {isBusy ? <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-white/60">Syncing changes...</span> : null}
-        </div>
       </section>
 
-      <KanbanAiInsights
-        projectName={projectLabel}
-        insights={kanbanInsights}
-        isLoading={kanbanInsightsQuery.isLoading}
-        isError={kanbanInsightsQuery.isError}
-        errorMessage={kanbanInsightsErrorMessage}
-        onRetry={() => void kanbanInsightsQuery.refetch()}
-      />
+      <div className="mt-3 mb-5 flex flex-col gap-2 text-xs text-white/45 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+        <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1">
+          {isSearching ? `Showing ${filteredTasks.length} matching tasks` : `Showing ${filteredTasks.length} tasks`}
+        </span>
+        <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1">{canMove ? "Drag enabled" : "Drag disabled"}</span>
+        {isBusy ? <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-white/60">Syncing changes...</span> : null}
+      </div>
 
-      <section className="flex-1 min-h-0">
-        {search.trim() && filteredTasks.length === 0 ? (
-          <div className="flex h-full min-h-[320px] items-center justify-center rounded-[28px] border border-white/10 bg-white/[0.03] px-6 py-10 text-center">
-            <div className="max-w-sm">
-              <p className="text-sm uppercase tracking-[0.22em] text-violet-200/80">Search</p>
-              <h2 className="mt-3 text-2xl font-semibold text-white">No matching tasks found</h2>
-              <p className="mt-2 text-sm leading-6 text-white/55">Try another keyword.</p>
-            </div>
-          </div>
-        ) : (
-          <KanbanBoard
-            groupedTasks={groupedTasks}
-            draggingTaskId={draggingTaskId}
-            dragOverColumn={dragOverColumn}
-            columnHealth={kanbanInsights?.columnHealth}
-            canMoveTask={canMove}
-            canCreateTask={canCreate}
-            onCreateTask={openCreateDialog}
-            onTaskDragStart={(task) => handleTaskDragStart(task.id)}
-            onTaskDragEnd={handleTaskDragEnd}
-            onTaskDrop={handleTaskDrop}
-            onColumnDragEnter={handleColumnDragEnter}
-            onColumnDragLeave={handleColumnDragLeave}
+      <motion.div layout className="flex flex-col gap-6">
+        <motion.div
+          layout
+          transition={{ duration: 0.28, ease: "easeOut" }}
+          className={isSearching ? "order-first" : "order-last"}
+        >
+          <section className="flex-1 min-h-0">
+            <KanbanBoard
+              search={trimmedSearch}
+              groupedTasks={groupedTasks}
+              draggingTaskId={draggingTaskId}
+              dragOverColumn={dragOverColumn}
+              columnHealth={kanbanInsights?.columnHealth}
+              canMoveTask={canMove}
+              canCreateTask={canCreate}
+              onCreateTask={openCreateDialog}
+              onTaskDragStart={(task) => handleTaskDragStart(task.id)}
+              onTaskDragEnd={handleTaskDragEnd}
+              onTaskDrop={handleTaskDrop}
+              onColumnDragEnter={handleColumnDragEnter}
+              onColumnDragLeave={handleColumnDragLeave}
+              onClearSearch={() => setSearch("")}
+            />
+          </section>
+        </motion.div>
+
+        <motion.div layout transition={{ duration: 0.28, ease: "easeOut" }} className={isSearching ? "order-last" : "order-first"}>
+          <KanbanAiInsights
+            projectName={projectLabel}
+            insights={kanbanInsights}
+            isLoading={kanbanInsightsQuery.isLoading}
+            isError={kanbanInsightsQuery.isError}
+            errorMessage={kanbanInsightsErrorMessage}
+            onRetry={() => void kanbanInsightsQuery.refetch()}
           />
-        )}
-      </section>
+        </motion.div>
+      </motion.div>
 
       <Dialog
         open={createOpen}
