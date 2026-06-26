@@ -311,7 +311,7 @@ function KanbanPage({ projectId }: KanbanPageProps) {
         </div>
       </section>
 
-      <div className="mt-3 mb-5 flex flex-col gap-2 text-xs text-white/45 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+      <div className="mt-0 mb-0 flex flex-col gap-2 text-xs text-white/45 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
         <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1">
           {isSearching ? `Showing ${filteredTasks.length} matching tasks` : `Showing ${filteredTasks.length} tasks`}
         </span>

@@ -116,7 +116,7 @@ function KanbanColumn({
               <Badge
                 variant="muted"
                 title={health.reason}
-                className={cn("rounded-full border px-3 py-1 text-[10px] font-semibold tracking-[0.08em]", healthStyles[health.tone])}
+                className={cn("whitespace-nowrap rounded-full border px-3 py-1 text-[10px] font-semibold tracking-[0.08em]", healthStyles[health.tone])}
               >
                 {health.label}
               </Badge>
